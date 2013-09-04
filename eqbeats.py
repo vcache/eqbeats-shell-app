@@ -181,7 +181,7 @@ Examples:
   %s complaint "Such a good software"
 
 Report bugs to <igor.bereznyak@gmail.com>.'''
-% (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
+% (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
 elif command == 'play':
 	played = False
 
