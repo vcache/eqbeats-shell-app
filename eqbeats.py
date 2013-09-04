@@ -137,12 +137,9 @@ elif command == 'search' or command == 'xs':
 	verbose("Tracks matching \"%s\": " % (argument, ))
 	r = requests.get('https://eqbeats.org/tracks/search/json?q=%s' % (argument,))
 	if r.status_code == 200:
-		results = r.json
-		if len(results) > 0:
-			for i in results:
-				print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-		else:
-			verbose("\033[1;35m* (Nothing) *\033[0m")
+		if (len(r.json) == 0) verbose("\033[1;35m* (Nothing) *\033[0m")
+		for i in r.json:
+			print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
 	r = requests.get('https://eqbeats.org/users/search/json?q=%s' % (argument,))
 	if r.status_code == 200:
 		results = r.json
