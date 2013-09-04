@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 #
-# TODO: add tasks
+# TODO: playing queue
 # TODO: play-cached, play-random, play "some string", play "username"
 # TODO: show-track, show-user
 # TODO: playlists?
+# TODO: complaint
 
 from __future__ import print_function
 import sys, os, requests, errno, subprocess, time, pickle
@@ -58,6 +59,25 @@ if not os.path.exists(eqdir):
 	os.makedirs(eqdir)
 
 # common routines
+
+def marshall(fname):
+	try:
+		f = open(fname, 'rb')
+		content = pickle.load(f)
+		f.close()
+	except:
+		content = []
+	return content
+
+def demarshall(data, fname):
+	try:
+		f = open(fname, 'wb')
+		pickle.dump(data, f)
+		f.close()
+	except e:
+		error('Failed to write %s: %s' % (fname, e,))
+		return False
+	return True
 
 def play(track_id):
 	if track_id == '' or not track_id.isdigit():
@@ -114,6 +134,7 @@ Commands:
   show-track          show track info (specify track's id as an argument)a
   list                list all tracks uploaded at EqBeats
   cleanup             delete cached files
+  complaint           annoyed? write a complaint
 
 Examples:
   %s --verbose play 1234
@@ -137,7 +158,7 @@ elif command == 'search' or command == 'xs':
 	verbose("Tracks matching \"%s\": " % (argument, ))
 	r = requests.get('https://eqbeats.org/tracks/search/json?q=%s' % (argument,))
 	if r.status_code == 200:
-		if (len(r.json) == 0) verbose("\033[1;35m* (Nothing) *\033[0m")
+		if len(r.json) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
 		for i in r.json:
 			print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
 	r = requests.get('https://eqbeats.org/users/search/json?q=%s' % (argument,))
@@ -148,35 +169,21 @@ elif command == 'search' or command == 'xs':
 			for i in results: print ('  \033[35m%s\033[0m: %s' % (i['name'], i['link'],))
 elif command == 'daemon':
 	verbose('Working as a daemon')
+	noticed_fname = '%s/.noticed' % (eqdir, )
 	# TODO: check that only one daemon running
 	while True:
 		r = requests.get('https://eqbeats.org/tracks/latest/json')
 		if r.status_code == 200:
-			# get noticed
-			try:
-				f = open('%s/.noticed' % eqdir, 'rb')
-				noticed = pickle.load(f)
-				f.close()
-			except:
-				noticed = []
-			# check for new
+			noticed = marshall(noticed_fname)
 			for i in r.json:
 				if not i['id'] in noticed:
 					verbose('New track %s\t\033[1;35m%s\033[0m by \033[35m%s\033[0m' %(i['id'], i['title'], i['artist']['name'],))
-					if notify_latest:
-						subprocess.call(['notify-send', 'EqBeats.org', 'New tune #%s by %s' % (i['id'], i['artist']['name'],)])
-					if play_latest:
-						play(str(i['id']))
+					if notify_latest: subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
+					if play_latest: play(str(i['id']))
 					noticed.append(i['id'])
-			# dump noticed
-			try:
-				f = open('%s/.noticed' % eqdir, 'wb')
-				pickle.dump(noticed, f)
-				f.close()
-			except e:
-				error('Failed to write noticed: %s' % e)
+					demarshall(noticed, noticed_fname)
 		time.sleep(check_period)
-		# TODO: substract froms sleep time spended for 'check for new'
+		# TODO: substract froms sleep time already spended
 elif command == 'list':
 	r = requests.get('https://eqbeats.org/tracks/all/json')
 	if r.status_code == 200:
