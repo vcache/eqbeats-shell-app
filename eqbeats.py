@@ -99,7 +99,7 @@ def play(track_id):
 		n = r.json if old_req else r.json()
 		if r.status_code == 200:
 			verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
-			r2 = requests.get(n['download']['mp3'])
+			r2 = requests.get(n['download']['mp3']) if old_req else requests.get(n['download']['mp3'], stream=True)
 			if r2.status_code == 200:
 				verbose('Saving %s' % (cached, ))
 				try:
