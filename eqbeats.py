@@ -131,7 +131,7 @@ elif command == 'play':
 elif command == 'search' or command == 'xs':
 	if command == 'xs':
 		try:
-			argument = subprocess.check_output(['xsel', '-o'], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
+			argument = subprocess.check_output(['xsel', '-o'])
 		except:
 			exit(1)
 	verbose("Tracks matching \"%s\": " % (argument, ))
