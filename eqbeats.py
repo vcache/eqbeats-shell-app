@@ -29,7 +29,7 @@ FNULL = open(os.devnull, 'w')
 
 # check updates
 
-r = requests.get('https://github.com/vcache/eqbeats-shell-app/blob/master/eqbeats.py')
+r = requests.get('https://raw.github.com/vcache/eqbeats-shell-app/master/eqbeats.py')
 f = open(sys.argv[0], 'r')
 if not r.text == f.read():
 	print('\033[1;31m*\033[0m There is newer version available here: \033[31mhttps://github.com/vcache/eqbeats-shell-app\033[0m \033[1;31m*\033[0m\n')
