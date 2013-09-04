@@ -92,9 +92,9 @@ def demarshall(data, fname):
 
 def play(track_id):
 	cached = '%s/%d.mp3' % (eqdir, track_id, )
+	r = requests.get('https://eqbeats.org/track/%d/json' % (track_id,))
+	n = r.json if old_req else r.json()
 	if not os.path.isfile(cached):
-		r = requests.get('https://eqbeats.org/track/%d/json' % (track_id,))
-		n = r.json if old_req else r.json()
 		if r.status_code == 200:
 			verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
 			r2 = requests.get(n['download']['mp3']) if old_req else requests.get(n['download']['mp3'], stream=True)
@@ -103,32 +103,31 @@ def play(track_id):
 				f = open(cached, 'wb')
 				done = 0.0
 				total = float(r2.headers.get('content-length'))
-				prv = 0
 				while True:
 					buf = r2.raw.read(8192)
 					if not buf: break
 					f.write(buf)
 					done = done + len(buf)
-					if is_verbose:
-						for i in range(prv): sys.stdout.write('\b')
-						label = 'Done %.03f%%' % (done / total * 100.0,)
-						prv = len(label)
-						sys.stdout.write(label)
+					if done % 2 == 0:
+						sys.stdout.write('\r    \033[0m \033[1;35m%s\033[0m by \033[35m%s\033[0m (buffering %.01f%%)' %
+							((n['title'], n['artist']['name'], done / total * 100.0,)))
 				f.close()
 			else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
 		else: error("Failed to request: %d" % (r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
 
 	if os.path.exists(cached):
+		sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m \033[1;35m%s\033[0m by \033[35m%s\033[0m                               \n' %
+			((n['title'], n['artist']['name'],)))
 		try:
-			subprocess.call(["mplayer", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
+			subprocess.call(["mplayer", cached], stdout=FNULL, stderr=subprocess.STDOUT)
 		except OSError as e:
 			if e.errno == errno.ENOENT:
 				try:
-					subprocess.call(["mpg123", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
+					subprocess.call(["mpg123", cached], stdout=FNULL, stderr=subprocess.STDOUT)
 				except OSError as e2:
 					if e2.errno == errno.ENOENT:
-						subprocess.call(["ffplay", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
+						subprocess.call(["ffplay", cached], stdout=FNULL, stderr=subprocess.STDOUT)
 	return True
 
 def complaint(msg):
