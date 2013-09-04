@@ -169,6 +169,9 @@ elif command == 'search' or command == 'xs':
 			for i in results: print ('  \033[35m%s\033[0m: %s' % (i['name'], i['link'],))
 elif command == 'daemon':
 	verbose('Working as a daemon')
+	if not notify_latest and not play_latest:
+		error("Please select --play-latest or --notify-latest or both")
+		exit(1)
 	noticed_fname = '%s/.noticed' % (eqdir, )
 	# TODO: check that only one daemon running
 	while True:
