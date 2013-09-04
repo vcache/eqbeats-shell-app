@@ -112,8 +112,8 @@ def play(track_id):
 					if not buf: break
 					f.write(buf)
 					done = done + len(buf)
-					if time.time() - t >= .5:
-						sys.stdout.write('\r  \033[1;31m%s\033[0m %s (buffering %.01f%%)' % (spinner[spin % len(spinner)], info_line, done / total * 100.0,))
+					if time.time() - t >= .24:
+						sys.stdout.write('\r  \033[1;31m%s\033[0m %s (buffering %.01f%%)\033[K' % (spinner[spin % len(spinner)], info_line, done / total * 100.0,))
 						sys.stdout.flush()
 						spin += 1
 						t = time.time()
