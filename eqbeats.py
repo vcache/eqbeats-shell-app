@@ -6,7 +6,7 @@
 # TODO: playlists?
 
 from __future__ import print_function
-import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket, random
+import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket,  random, threading
 from os.path import expanduser
 
 old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
@@ -90,12 +90,26 @@ def demarshall(data, fname):
 		return False
 	return True
 
+class ExtPlayer(threading.Thread):
+	def __init__(self,filename):
+		threading.Thread.__init__(self)
+		self.daemon = True
+		self.filename = filename
+	def run(self):
+		if os.path.exists(self.filename):
+			try:
+				subprocess.call(["mplayer", self.filename], stdout=FNULL, stderr=subprocess.STDOUT)
+			except OSError as e:
+				if e.errno == errno.ENOENT:
+					subprocess.call(["mpg123", self.filename], stdout=FNULL, stderr=subprocess.STDOUT)
+
 def play(track_id):
 	spinner = ['|', '/', '-', '\\']
 	cached = '%s/%d.mp3' % (eqdir, track_id, )
 	r = requests.get('https://eqbeats.org/track/%d/json' % (track_id,))
 	n = r.json if old_req else r.json()
-	info_line = ' \033[1;35m%s\033[0m by \033[35m%s\033[0m' % (n['title'], n['artist']['name'],)
+	info_line = '\033[1;35m%s\033[0m by \033[35m%s\033[0m' % (n['title'], n['artist']['name'],)
+	extplayer = None
 	if not os.path.isfile(cached):
 		if r.status_code == 200:
 			verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
@@ -113,7 +127,15 @@ def play(track_id):
 					f.write(buf)
 					done = done + len(buf)
 					if time.time() - t >= .24:
-						sys.stdout.write('\r  \033[1;31m%s\033[0m %s (buffering %.01f%%)\033[K' % (spinner[spin % len(spinner)], info_line, done / total * 100.0,))
+						percentage = done / total * 100.0
+						if percentage > 15.0 and extplayer is None:
+							extplayer = ExtPlayer(cached)
+							extplayer.start()
+						if extplayer is None:
+							sys.stdout.write( '\r  \033[1;31m%s\033[0m  %s (buffering %.01f%%)\033[K' % (spinner[spin % len(spinner)], info_line, percentage,))
+						else:
+							sys.stdout.write(u'\r  \033[1;31m%s\033[0m \033[36m\u25B6\033[0m%s \033[2;30m(buffering %.01f%%)\033[0m\033[K'
+								% (spinner[spin % len(spinner)], info_line, percentage,))
 						sys.stdout.flush()
 						spin += 1
 						t = time.time()
@@ -122,19 +144,13 @@ def play(track_id):
 		else: error("Failed to request: %d" % (r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
 
-	if os.path.exists(cached):
-		sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m %s\033[K' % (info_line,))
-		sys.stdout.flush()
-		try:
-			subprocess.call(["mplayer", cached], stdout=FNULL, stderr=subprocess.STDOUT)
-		except OSError as e:
-			if e.errno == errno.ENOENT:
-				try:
-					subprocess.call(["mpg123", cached], stdout=FNULL, stderr=subprocess.STDOUT)
-				except OSError as e2:
-					if e2.errno == errno.ENOENT:
-						subprocess.call(["ffplay", cached], stdout=FNULL, stderr=subprocess.STDOUT)
-		sys.stdout.write(u'\r    %s\033[K\n' % (info_line,))
+	if extplayer is None:
+		extplayer = ExtPlayer(cached)
+		extplayer.start()
+	sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m  %s\033[K' % (info_line,))
+	sys.stdout.flush()
+	extplayer.join()
+	sys.stdout.write(u'\r     %s\033[K\n' % (info_line,))
 	return True
 
 def complaint(msg):
