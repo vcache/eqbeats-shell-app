@@ -1,10 +1,14 @@
 #!/usr/bin/env python
+#
+# TODO: add tasks
 
 from __future__ import print_function
 import sys, os, requests, errno, subprocess, time, pickle
 from os.path import expanduser
 
 # init
+
+if not __name__ == '__main__': exit(0)
 
 play_latest = False
 notify_latest = False
@@ -112,11 +116,13 @@ Examples:
   %s --verbose play 1234
   %s play-random
   %s play-cached
-  %s play levels
+  %s play evdog
   %s play "true true friend"
   %s search "sim gretina"
   %s --play-latest --notify-latest daemon
-''' % (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], ))
+
+Report bugs to <igor.bereznyak@gmail.com>.'''
+% (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], ))
 elif command == 'play':
 	if not play(argument): exit(1)
 elif command == 'search' or command == 'xs':
