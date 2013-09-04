@@ -4,7 +4,6 @@
 # TODO: play-cached, play-random, play "some string", play "username"
 # TODO: show-track, show-user
 # TODO: playlists?
-# TODO: complaint
 
 from __future__ import print_function
 import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket
@@ -54,7 +53,7 @@ while i < len(sys.argv):
 		check_period = 60 * int((sys.argv[i])[k+1:])
 	elif sys.argv[i] in ['daemon', 'help', 'xs', 'list', 'cleanup']:
 		command = sys.argv[i]
-	elif sys.argv[i] == 'play' or sys.argv[i] == 'search':
+	elif sys.argv[i] in ['play', 'search', 'complaint']:
 		command = sys.argv[i]
 		argument = sys.argv[i+1]
 		i = i + 1
@@ -109,7 +108,7 @@ def play(track_id):
 						buffer = r2.raw.read(8192)
 						if not buffer: break
 						f.write(buffer)
-					f.close
+					f.close()
 				except e: error('Failed to save file: %s' % e)
 			else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
 		else: error("Failed to request: %d" % (r.status_code, ))
@@ -123,6 +122,23 @@ def play(track_id):
 			except OSError as e2:
 				if e2.errno == errno.ENOENT:
 					subprocess.call(["ffplay", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
+	return True
+
+def complaint(msg):
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	s.connect(('irc.ponychat.net', 6667))
+	s.send('NICK angryuser\r\n')
+	time.sleep(1)
+	s.send('USER angryuser angryuser irc.poynchat.net :User of eqbeats-shell-app\r\n')
+	time.sleep(1)
+	s.send('NICK angryuser\r\n')
+	time.sleep(1)
+	s.send('JOIN #eqbeats\r\n')
+	time.sleep(1)
+	s.send('PRIVMSG #eqbeats :%s\r\n' % (msg, ))
+	time.sleep(1)
+	s.send('QUIT :Just a angry user complaints on eqbeats-shell-app\r\n')
+	s.close()
 	return True
 
 # execute the command
@@ -157,9 +173,10 @@ Examples:
   %s play "true true friend"
   %s search "sim gretina"
   %s --play-latest --notify-latest daemon
+  %s complaint "Such a good software"
 
 Report bugs to <igor.bereznyak@gmail.com>.'''
-% (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], ))
+% (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
 elif command == 'play':
 	if not play(argument): exit(1)
 elif command == 'search' or command == 'xs':
@@ -218,6 +235,8 @@ elif command == 'cleanup':
 			print('Press Ctrl+C to cancel \033[1;31m%d\033[0m' % (4-i,))
 			time.sleep(1)
 		for i in victims: os.remove(i)
+elif command == 'complaint':
+	complaint('igor: I just try your "eqbeats-shell-app" and what I think about it "' + argument + '". Thats all. Deal with it.')
 else:
 	error('Unknown command: %s' % (command, ))
 	exit(1)
