@@ -91,9 +91,11 @@ def demarshall(data, fname):
 	return True
 
 def play(track_id):
+	spinner = ['|', '/', '-', '\\']
 	cached = '%s/%d.mp3' % (eqdir, track_id, )
 	r = requests.get('https://eqbeats.org/track/%d/json' % (track_id,))
 	n = r.json if old_req else r.json()
+	info_line = ' \033[1;35m%s\033[0m by \033[35m%s\033[0m' % (n['title'], n['artist']['name'],)
 	if not os.path.isfile(cached):
 		if r.status_code == 200:
 			verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
@@ -103,22 +105,26 @@ def play(track_id):
 				f = open(cached, 'wb')
 				done = 0.0
 				total = float(r2.headers.get('content-length'))
+				t = 0
+				spin = 0
 				while True:
 					buf = r2.raw.read(8192)
 					if not buf: break
 					f.write(buf)
 					done = done + len(buf)
-					if done % 2 == 0:
-						sys.stdout.write('\r    \033[1;35m%s\033[0m by \033[35m%s\033[0m (buffering %.01f%%)' %
-							((n['title'], n['artist']['name'], done / total * 100.0,)))
+					if time.time() - t >= .5:
+						sys.stdout.write('\r  \033[1;31m%s\033[0m %s (buffering %.01f%%)' % (spinner[spin % len(spinner)], info_line, done / total * 100.0,))
+						sys.stdout.flush()
+						spin += 1
+						t = time.time()
 				f.close()
 			else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
 		else: error("Failed to request: %d" % (r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
 
 	if os.path.exists(cached):
-		sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m \033[1;35m%s\033[0m by \033[35m%s\033[0m                               \n' %
-			((n['title'], n['artist']['name'],)))
+		sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m %s\033[K' % (info_line,))
+		sys.stdout.flush()
 		try:
 			subprocess.call(["mplayer", cached], stdout=FNULL, stderr=subprocess.STDOUT)
 		except OSError as e:
@@ -128,6 +134,7 @@ def play(track_id):
 				except OSError as e2:
 					if e2.errno == errno.ENOENT:
 						subprocess.call(["ffplay", cached], stdout=FNULL, stderr=subprocess.STDOUT)
+		sys.stdout.write(u'\r    %s\033[K\n' % (info_line,))
 	return True
 
 def complaint(msg):
