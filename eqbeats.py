@@ -7,7 +7,7 @@
 # TODO: complaint
 
 from __future__ import print_function
-import sys, os, requests, errno, subprocess, time, pickle, pkg_resources
+import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket
 from os.path import expanduser
 
 old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
@@ -103,12 +103,14 @@ def play(track_id):
 			r2 = requests.get(n['download']['mp3'])
 			if r2.status_code == 200:
 				verbose('Saving %s' % (cached, ))
-				f = open(cached, 'wb')
-				while True:
-					buffer = r2.raw.read(8192)
-					if not buffer: break
-					f.write(buffer)
-				f.close
+				try:
+					f = open(cached, 'wb')
+					while True:
+						buffer = r2.raw.read(8192)
+						if not buffer: break
+						f.write(buffer)
+					f.close
+				except e: error('Failed to save file: %s' % e)
 			else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
 		else: error("Failed to request: %d" % (r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
