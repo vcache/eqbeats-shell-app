@@ -100,15 +100,21 @@ def play(track_id):
 			r2 = requests.get(n['download']['mp3']) if old_req else requests.get(n['download']['mp3'], stream=True)
 			if r2.status_code == 200:
 				verbose('Saving %s' % (cached, ))
-				try:
-					f = open(cached, 'wb')
-					while True:
-						buffer = r2.raw.read(8192)
-						if not buffer: break
-						f.write(buffer)
-# TODO: add done/total output
-					f.close()
-				except e: error('Failed to save file: %s' % e)
+				f = open(cached, 'wb')
+				done = 0.0
+				total = float(r2.headers.get('content-length'))
+				prv = 0
+				while True:
+					buf = r2.raw.read(8192)
+					if not buf: break
+					f.write(buf)
+					done = done + len(buf)
+					if is_verbose:
+						for i in range(prv): sys.stdout.write('\b')
+						label = 'Done %.03f%%' % (done / total * 100.0,)
+						prv = len(label)
+						sys.stdout.write(label)
+				f.close()
 			else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
 		else: error("Failed to request: %d" % (r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
@@ -168,8 +174,6 @@ Commands:
 
 Examples:
   %s --verbose play 1234
-  %s play-random
-  %s play-cached
   %s play evdog
   %s play "true true friend"
   %s search "sim gretina"
@@ -202,7 +206,7 @@ elif command == 'play':
 			verbose('Going to play this stuff: ')
 			for i in jsn:
 				print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-			for track in jsn: played = played or play(track['id'])
+			for track in jsn: play(track['id'])
 			
 elif command == 'search' or command == 'xs':
 	if command == 'xs':
