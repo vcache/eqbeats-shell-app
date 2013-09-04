@@ -205,7 +205,7 @@ elif command == 'play':
 			jsn = r.json if old_req else r.json()
 			verbose('Going to play this stuff: ')
 			for i in jsn:
-				print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
+				verbose('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
 			for track in jsn: play(track['id'])
 			
 elif command == 'search' or command == 'xs':
