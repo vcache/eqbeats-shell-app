@@ -6,7 +6,7 @@
 # TODO: playlists?
 
 from __future__ import print_function
-import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket
+import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket, random
 from os.path import expanduser
 
 old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
@@ -31,11 +31,12 @@ FNULL = open(os.devnull, 'w')
 
 # check updates
 
-r = requests.get('https://raw.github.com/vcache/eqbeats-shell-app/master/eqbeats.py')
-f = open(sys.argv[0], 'r')
-if not r.text == f.read():
-	print('\033[1;31m*\033[0m There is newer version available here: \033[31mhttps://github.com/vcache/eqbeats-shell-app\033[0m \033[1;31m*\033[0m\n')
-f.close()
+if random.random() < .4:
+	r = requests.get('https://raw.github.com/vcache/eqbeats-shell-app/master/eqbeats.py')
+	f = open(sys.argv[0], 'r')
+	if not r.text == f.read():
+		print('\033[1;31m*\033[0m There is newer version available here: \033[31mhttps://github.com/vcache/eqbeats-shell-app\033[0m \033[1;31m*\033[0m\n')
+	f.close()
 
 # parse args
 
@@ -90,12 +91,9 @@ def demarshall(data, fname):
 	return True
 
 def play(track_id):
-	if track_id == '' or not track_id.isdigit():
-		error('You didn\'t specify track id')
-		return False
-	cached = '%s/%s.mp3' % (eqdir, track_id, )
+	cached = '%s/%d.mp3' % (eqdir, track_id, )
 	if not os.path.isfile(cached):
-		r = requests.get('https://eqbeats.org/track/%s/json' % (track_id,))
+		r = requests.get('https://eqbeats.org/track/%d/json' % (track_id,))
 		n = r.json if old_req else r.json()
 		if r.status_code == 200:
 			verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
@@ -108,20 +106,23 @@ def play(track_id):
 						buffer = r2.raw.read(8192)
 						if not buffer: break
 						f.write(buffer)
+# TODO: add done/total output
 					f.close()
 				except e: error('Failed to save file: %s' % e)
 			else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
 		else: error("Failed to request: %d" % (r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
-	try:
-		subprocess.call(["mplayer", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
-	except OSError as e:
-		if e.errno == errno.ENOENT:
-			try:
-				subprocess.call(["mpg123", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
-			except OSError as e2:
-				if e2.errno == errno.ENOENT:
-					subprocess.call(["ffplay", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
+
+	if os.path.exists(cached):
+		try:
+			subprocess.call(["mplayer", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
+		except OSError as e:
+			if e.errno == errno.ENOENT:
+				try:
+					subprocess.call(["mpg123", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
+				except OSError as e2:
+					if e2.errno == errno.ENOENT:
+						subprocess.call(["ffplay", cached], stdout=None if is_verbose else FNULL, stderr=subprocess.STDOUT)
 	return True
 
 def complaint(msg):
@@ -178,13 +179,35 @@ Examples:
 Report bugs to <igor.bereznyak@gmail.com>.'''
 % (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
 elif command == 'play':
-	if not play(argument): exit(1)
+	played = False
+
+	# is it id?
+	if argument.isdigit():
+		played = play(int(argument))
+
+	# is it artist?
+#	if not played:
+#		r = requests.get('https://eqbeats.org/users/search/json?q=%s' % (argument, ))
+#		if r.status_code == 200:
+#			jsn = r.json if old_req else r.json()
+#			for artist in jsn:
+#				for track in artist['tracks']:
+#					played = played or play(track['id'])
+
+	# is it tracks?
+	if not played:
+		r =  requests.get('https://eqbeats.org/tracks/search/json?q=%s' % (argument, ))
+		if r.status_code == 200:
+			jsn = r.json if old_req else r.json()
+			verbose('Going to play this stuff: ')
+			for i in jsn:
+				print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
+			for track in jsn: played = played or play(track['id'])
+			
 elif command == 'search' or command == 'xs':
 	if command == 'xs':
-		try:
-			argument = subprocess.check_output(['xsel', '-o'])
-		except:
-			exit(1)
+		try:    argument = subprocess.check_output(['xsel', '-o'])
+		except:	exit(1)
 	verbose("Tracks matching \"%s\": " % (argument, ))
 	r = requests.get('https://eqbeats.org/tracks/search/json?q=%s' % (argument,))
 	if r.status_code == 200:
@@ -214,7 +237,7 @@ elif command == 'daemon':
 				if not i['id'] in noticed:
 					verbose('New track %s\t\033[1;35m%s\033[0m by \033[35m%s\033[0m' %(i['id'], i['title'], i['artist']['name'],))
 					if notify_latest: subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
-					if play_latest: play(str(i['id']))
+					if play_latest: play(i['id'])
 					noticed.append(i['id'])
 					demarshall(noticed, noticed_fname)
 		time.sleep(check_period)
