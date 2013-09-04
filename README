@@ -6,7 +6,8 @@
 	* 'xsel' tool --- for 'eqbeats xs'
 
 2. Installation
-	Just copy (or make symbolic link) file somewhere where your PATH points to and give +x permissions:
+	Just copy (or make symbolic link) file somewhere where your PATH
+	points to and give +x permissions:
 	$ chmod +x eqbeats.py
 
 	# mv eqbeats.py /usr/bin/eqbeats
@@ -19,7 +20,10 @@
 	Just run 'eqbeats' in your console to get futher directions.
 
 4. Communication
-	Drop me a mail to <igor.bereznyak@gmail.com> or find me at #eqbeats on the irc.ponychat.net.
+	Drop me a letter to <igor.bereznyak@gmail.com> or find me at #eqbeats
+	on the irc.ponychat.net.
 
 5. License
-	You may not redistribute, translate, modify, discuss on forums, sell, decompile, reverse-engineer, disassemble the Software (just kidding, do whatever you want).
+	You may not redistribute, translate, modify, discuss on forums, sell,
+	decompile, reverse-engineer or disassemble the Software
+	(just kidding, do whatever you want).
