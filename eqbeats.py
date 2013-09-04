@@ -109,7 +109,7 @@ def play(track_id):
 					f.write(buf)
 					done = done + len(buf)
 					if done % 2 == 0:
-						sys.stdout.write('\r    \033[0m \033[1;35m%s\033[0m by \033[35m%s\033[0m (buffering %.01f%%)' %
+						sys.stdout.write('\r    \033[1;35m%s\033[0m by \033[35m%s\033[0m (buffering %.01f%%)' %
 							((n['title'], n['artist']['name'], done / total * 100.0,)))
 				f.close()
 			else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
