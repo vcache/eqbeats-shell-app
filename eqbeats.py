@@ -7,8 +7,10 @@
 # TODO: complaint
 
 from __future__ import print_function
-import sys, os, requests, errno, subprocess, time, pickle
+import sys, os, requests, errno, subprocess, time, pickle, pkg_resources
 from os.path import expanduser
+
+old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
 
 # init
 
@@ -26,6 +28,7 @@ is_verbose = False
 error = lambda str: print("\033[1;31mERROR\033[0m: %s" % str)
 
 FNULL = open(os.devnull, 'w')
+
 
 # check updates
 
@@ -94,7 +97,7 @@ def play(track_id):
 	cached = '%s/%s.mp3' % (eqdir, track_id, )
 	if not os.path.isfile(cached):
 		r = requests.get('https://eqbeats.org/track/%s/json' % (track_id,))
-		n = r.json
+		n = r.json if old_req else r.json()
 		if r.status_code == 200:
 			verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
 			r2 = requests.get(n['download']['mp3'])
@@ -166,12 +169,13 @@ elif command == 'search' or command == 'xs':
 	verbose("Tracks matching \"%s\": " % (argument, ))
 	r = requests.get('https://eqbeats.org/tracks/search/json?q=%s' % (argument,))
 	if r.status_code == 200:
-		if len(r.json) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
-		for i in r.json:
+		jsn = r.json if old_req else r.json()
+		if len(jsn) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
+		for i in jsn:
 			print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
 	r = requests.get('https://eqbeats.org/users/search/json?q=%s' % (argument,))
 	if r.status_code == 200:
-		results = r.json
+		results = r.json if old_req else r.json()
 		if len(results) > 0:
 			verbose("Users matching \"%s\": " % (argument, ))
 			for i in results: print ('  \033[35m%s\033[0m: %s' % (i['name'], i['link'],))
@@ -186,7 +190,8 @@ elif command == 'daemon':
 		r = requests.get('https://eqbeats.org/tracks/latest/json')
 		if r.status_code == 200:
 			noticed = marshall(noticed_fname)
-			for i in r.json:
+			jsn = r.json if old_req else r.json()
+			for i in jsn:
 				if not i['id'] in noticed:
 					verbose('New track %s\t\033[1;35m%s\033[0m by \033[35m%s\033[0m' %(i['id'], i['title'], i['artist']['name'],))
 					if notify_latest: subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
@@ -198,7 +203,8 @@ elif command == 'daemon':
 elif command == 'list':
 	r = requests.get('https://eqbeats.org/tracks/all/json')
 	if r.status_code == 200:
-		for i in r.json:
+		jsn = r.json if old_req else r.json()
+		for i in jsn:
 			print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
 	else:
 		error('Failed to fetch list')
