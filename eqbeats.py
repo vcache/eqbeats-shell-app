@@ -102,7 +102,7 @@ class ExtPlayer(threading.Thread):
 				if e.errno == errno.ENOENT:
 					subprocess.call(["mpg123", self.filename], stdout=FNULL, stderr=subprocess.STDOUT)
 
-def play(track_id):
+def play(track_id, tip_line):
 	spinner = ['|', '/', '-', '\\']
 	cached = '%s/%d.mp3' % (eqdir, track_id, )
 	r = requests.get('https://eqbeats.org/track/%d/json' % (track_id,))
@@ -145,10 +145,11 @@ def play(track_id):
 	if extplayer is None:
 		extplayer = ExtPlayer(cached)
 		extplayer.start()
-	sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m  %s\033[K' % (info_line,))
+	sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m  %s \033[2;30m[%s]\033[0m\033[K' % (info_line, tip_line,))
 	sys.stdout.flush()
 	extplayer.join()
-	sys.stdout.write(u'\r     %s\033[K\n' % (info_line,))
+	sys.stdout.write(u'\r     %s \033[2;30m[%s]\033[0m\033[K' % (info_line, tip_line))
+	sys.stdout.flush()
 	return True
 
 def complaint(msg):
@@ -207,7 +208,7 @@ elif command == 'play':
 
 	# is it id?
 	if argument.isdigit():
-		played = play(int(argument))
+		played = play(int(argument), '1/1')
 
 	# is it artist?
 #	if not played:
@@ -226,8 +227,9 @@ elif command == 'play':
 			verbose('Going to play this stuff: ')
 			for i in jsn:
 				verbose('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-			for track in jsn: play(track['id'])
-			
+			for idx, track in enumerate(jsn): play(track['id'], '%d/%d' % (idx+1, len(jsn)) )
+	
+	print("")		
 elif command == 'search' or command == 'xs':
 	if command == 'xs':
 		try:    argument = subprocess.check_output(['xsel', '-o'])
@@ -261,7 +263,7 @@ elif command == 'daemon':
 				if not i['id'] in noticed:
 					verbose('New track %s\t\033[1;35m%s\033[0m by \033[35m%s\033[0m' %(i['id'], i['title'], i['artist']['name'],))
 					if notify_latest: subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
-					if play_latest: play(i['id'])
+					if play_latest: play(i['id'], '-')
 					noticed.append(i['id'])
 					marshall(noticed, noticed_fname)
 		time.sleep(check_period)
@@ -283,7 +285,7 @@ elif command == 'cleanup':
 			time.sleep(1)
 		for i in victims: os.remove(i)
 elif command == 'complaint':
-	complaint('igor: I just try your "eqbeats-shell-app" and what I think about it "' + argument + '". Thats all. Deal with it.')
+	complaint('!mail igor I just try your "eqbeats-shell-app" and here what I think about it: "' + argument + '". Thats all. Deal with it.')
 else:
 	error('Unknown command: %s' % (command, ))
 	exit(1)
