@@ -132,10 +132,9 @@ def play(track_id):
 							extplayer = ExtPlayer(cached)
 							extplayer.start()
 						if extplayer is None:
-							sys.stdout.write( '\r  \033[1;31m%s\033[0m  %s (buffering %.01f%%)\033[K' % (spinner[spin % len(spinner)], info_line, percentage,))
+							sys.stdout.write( '\r  \033[1;31m%s\033[0m  %s \033[2;30m(buffering %.01f%%)\033[0m\033[K'%(spinner[spin % len(spinner)], info_line, percentage,))
 						else:
-							sys.stdout.write(u'\r  \033[1;31m%s\033[0m \033[36m\u25B6\033[0m%s \033[2;30m(buffering %.01f%%)\033[0m\033[K'
-								% (spinner[spin % len(spinner)], info_line, percentage,))
+							sys.stdout.write(u'\r  \033[32m\u25B6\033[0m  %s \033[2;30m(buffering %.01f%%)\033[0m\033[K'%(info_line, percentage,))
 						sys.stdout.flush()
 						spin += 1
 						t = time.time()
