@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 #
 # TODO: playing queue
-# TODO: play-cached, play-random, play "some string", play "username"
+# TODO: play-cached, play-random
 # TODO: show-track, show-user
 # TODO: playlists?
 
 from __future__ import print_function
-import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket,  random, threading
+import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket, random, threading
 from os.path import expanduser
 
 old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
@@ -28,10 +28,9 @@ error = lambda str: print("\033[1;31mERROR\033[0m: %s" % str)
 
 FNULL = open(os.devnull, 'w')
 
-
 # check updates
 
-if random.random() < .4:
+if random.random() < .2:
 	r = requests.get('https://raw.github.com/vcache/eqbeats-shell-app/master/eqbeats.py')
 	f = open(sys.argv[0], 'r')
 	if not r.text == f.read():
@@ -71,7 +70,7 @@ if not os.path.exists(eqdir):
 
 # common routines
 
-def marshall(fname):
+def demarshall(fname):
 	try:
 		f = open(fname, 'rb')
 		content = pickle.load(f)
@@ -80,7 +79,7 @@ def marshall(fname):
 		content = []
 	return content
 
-def demarshall(data, fname):
+def marshall(data, fname):
 	try:
 		f = open(fname, 'wb')
 		pickle.dump(data, f)
@@ -256,7 +255,7 @@ elif command == 'daemon':
 	while True:
 		r = requests.get('https://eqbeats.org/tracks/latest/json')
 		if r.status_code == 200:
-			noticed = marshall(noticed_fname)
+			noticed = demarshall(noticed_fname)
 			jsn = r.json if old_req else r.json()
 			for i in jsn:
 				if not i['id'] in noticed:
@@ -264,9 +263,9 @@ elif command == 'daemon':
 					if notify_latest: subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
 					if play_latest: play(i['id'])
 					noticed.append(i['id'])
-					demarshall(noticed, noticed_fname)
+					marshall(noticed, noticed_fname)
 		time.sleep(check_period)
-		# TODO: substract froms sleep time already spended
+		# TODO: substract froms sleep time already spent
 elif command == 'list':
 	r = requests.get('https://eqbeats.org/tracks/all/json')
 	if r.status_code == 200:
