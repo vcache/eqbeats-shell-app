@@ -57,6 +57,11 @@ while i < len(sys.argv):
 		command = sys.argv[i]
 		argument = sys.argv[i+1]
 		i = i + 1
+	elif sys.argv[i] == 'show':
+		command = sys.argv[i] + '.' + sys.argv[i+1]
+		i += 1
+		argument = sys.argv[i+1]
+		i += 1
 	else:
 		print ("Unknown argument \033[1;31m%s\033[0m" % (sys.argv[i], ))
 		exit(1)
@@ -188,6 +193,34 @@ def complaint(msg):
 	s.close()
 	return True
 
+def get_user(uid):
+	r = requests.get('https://eqbeats.org/user/%d/json' % uid)
+	if r.status_code != 200:
+		error('Failed to fetch user info')
+		return {}
+	return r.json if old_req else r.json()
+
+def find_users(query):
+	r = requests.get('https://eqbeats.org/users/search/json?q=%s' % query)
+	if r.status_code != 200:
+		error('Failed to find users info')
+		return []
+	return r.json if old_req else r.json()
+
+def get_track(tid):
+	r = requests.get('https://eqbeats.org/track/%d/json' % tid)
+	if r.status_code != 200:
+		error('Failed to fetch track info')
+		return {}
+	return r.json if old_req else r.json()
+
+def find_tracks(query):
+	r =  requests.get('https://eqbeats.org/tracks/search/json?q=%s' % query)
+	if r.status_code != 200:
+		error('Failed to find tracks info')
+		return []
+	return r.json if old_req else r.json()
+	
 # execute the command
 
 if command == 'help' or command == '':
@@ -203,17 +236,20 @@ Keys:
 Commands:
   help                print this message and exit
   daemon              start workin in background command
-  play                download and play track (specify track's id as an argument)
+  play                play music(if any), argument may be:
+                        - none, play all cached tracks (TODO)
+                        - numerical id, play track with a give ID
+                        - text string, play all tracks matching text
+                      when more than 1 arguments provided, will play all of them (TODO)
   search              search EqBeats
   xs                  search EqBeats for currently selected text
-  show-user           show user info (specify user's id as an argument)
-  show-track          show track info (specify track's id as an argument)a
+  show user           show user info (specify user's id as an argument) (TODO)
   list                list all tracks uploaded at EqBeats
   cleanup             delete cached files
   complaint           annoyed? write a complaint
 
 Examples:
-  %s --verbose play 1234
+  %s play 1234
   %s play evdog
   %s play "true true friend"
   %s search "sim gretina"
@@ -241,13 +277,11 @@ elif command == 'play':
 
 	# is it tracks?
 	if not played:
-		r =  requests.get('https://eqbeats.org/tracks/search/json?q=%s' % (argument, ))
-		if r.status_code == 200:
-			jsn = r.json if old_req else r.json()
-			verbose('Going to play this stuff: ')
-			for i in jsn:
-				verbose('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-			for idx, track in enumerate(jsn): play(track['id'], '#%d %d/%d' % (i['id'], idx+1, len(jsn)) )
+		tracks = find_tracks(argument)
+		verbose('Going to play this stuff: ')
+		for i in tracks:
+			verbose('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
+		for idx, track in enumerate(tracks): play(track['id'], '#%d %d/%d' % (i['id'], idx+1, len(tracks)) )
 	
 	print("")		
 elif command == 'search' or command == 'xs':
@@ -255,18 +289,13 @@ elif command == 'search' or command == 'xs':
 		try:    argument = subprocess.check_output(['xsel', '-o'])
 		except:	exit(1)
 	verbose("Tracks matching \"%s\": " % (argument, ))
-	r = requests.get('https://eqbeats.org/tracks/search/json?q=%s' % (argument,))
-	if r.status_code == 200:
-		jsn = r.json if old_req else r.json()
-		if len(jsn) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
-		for i in jsn:
-			print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-	r = requests.get('https://eqbeats.org/users/search/json?q=%s' % (argument,))
-	if r.status_code == 200:
-		results = r.json if old_req else r.json()
-		if len(results) > 0:
-			verbose("Users matching \"%s\": " % (argument, ))
-			for i in results: print ('  \033[35m%s\033[0m: %s' % (i['name'], i['link'],))
+	tracks = find_tracks(argument)
+	if len(tracks) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
+	for i in tracks:
+		print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
+	users = find_users(argument)
+	verbose("Users matching \"%s\": " % (argument, ))
+	for i in users: print ('  \033[35m%s\033[0m: %s' % (i['name'], i['link'],))
 elif command == 'daemon':
 	verbose('Working as a daemon')
 	if not notify_latest and not play_latest:
@@ -304,6 +333,13 @@ elif command == 'cleanup':
 			print('Press Ctrl+C to cancel \033[1;31m%d\033[0m' % (4-i,))
 			time.sleep(1)
 		for i in victims: os.remove(i)
+elif command in ['show.user', 'show.users']:
+	users = find_users(argument)
+#	users = [get_user(int(argument))] if argument.isdigit() else find_users(argument)
+#   TODO: get_user return incorrect json
+	for u in users:
+		print('#%d \033[35m%s\033[0m [%s]%s'
+			% (u['id'], u['name'], u['link'], (': '+u['description']) if 'description' in u else ''))
 elif command == 'complaint':
 	complaint('!mail igor I just try your "eqbeats-shell-app" and here what I think about it: "' + argument + '". Thats all. Deal with it.')
 else:
