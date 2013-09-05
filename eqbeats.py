@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 #
 # TODO: playing queue
-# TODO: play-cached, play-random
-# TODO: show-track, show-user
+# TODO: play-random
 # TODO: playlists?
 
 from __future__ import print_function
@@ -51,17 +50,12 @@ while i < len(sys.argv):
 	elif sys.argv[i].startswith('--check-period'):
 		k = sys.argv[i].find('=')
 		check_period = 60 * int((sys.argv[i])[k+1:])
-	elif sys.argv[i] in ['daemon', 'help', 'xs', 'list', 'cleanup']:
+	elif sys.argv[i] in ['daemon', 'help', 'list', 'cleanup']:
 		command = sys.argv[i]
 	elif sys.argv[i] in ['play', 'search', 'complaint']:
 		command = sys.argv[i]
 		argument = sys.argv[i+1]
 		i = i + 1
-	elif sys.argv[i] == 'show':
-		command = sys.argv[i] + '.' + sys.argv[i+1]
-		i += 1
-		argument = sys.argv[i+1]
-		i += 1
 	else:
 		print ("Unknown argument \033[1;31m%s\033[0m" % (sys.argv[i], ))
 		exit(1)
@@ -242,8 +236,6 @@ Commands:
                         - text string, play all tracks matching text
                       when more than 1 arguments provided, will play all of them (TODO)
   search              search EqBeats
-  xs                  search EqBeats for currently selected text
-  show user           show user info (specify user's id as an argument) (TODO)
   list                list all tracks uploaded at EqBeats
   cleanup             delete cached files
   complaint           annoyed? write a complaint
@@ -284,10 +276,7 @@ elif command == 'play':
 		for idx, track in enumerate(tracks): play(track['id'], '#%d %d/%d' % (i['id'], idx+1, len(tracks)) )
 	
 	print("")		
-elif command == 'search' or command == 'xs':
-	if command == 'xs':
-		try:    argument = subprocess.check_output(['xsel', '-o'])
-		except:	exit(1)
+elif command == 'search':
 	verbose("Tracks matching \"%s\": " % (argument, ))
 	tracks = find_tracks(argument)
 	if len(tracks) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
@@ -333,13 +322,6 @@ elif command == 'cleanup':
 			print('Press Ctrl+C to cancel \033[1;31m%d\033[0m' % (4-i,))
 			time.sleep(1)
 		for i in victims: os.remove(i)
-elif command in ['show.user', 'show.users']:
-	users = find_users(argument)
-#	users = [get_user(int(argument))] if argument.isdigit() else find_users(argument)
-#   TODO: get_user return incorrect json
-	for u in users:
-		print('#%d \033[35m%s\033[0m [%s]%s'
-			% (u['id'], u['name'], u['link'], (': '+u['description']) if 'description' in u else ''))
 elif command == 'complaint':
 	complaint('!mail igor I just try your "eqbeats-shell-app" and here what I think about it: "' + argument + '". Thats all. Deal with it.')
 else:
