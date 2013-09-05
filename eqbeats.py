@@ -89,18 +89,31 @@ def marshall(data, fname):
 		return False
 	return True
 
+def get_duration(fname):
+	out = subprocess.check_output(['mplayer', '-ao', 'null', '-identify', '-frames', '0', fname])
+	fields = out.split('\n')
+	for f in fields:
+		if (f.startswith('ID_LENGTH')):
+			k = f.find('=')
+			return float(f[k+1:])
+	return -1.0
+
 class ExtPlayer(threading.Thread):
 	def __init__(self,filename):
 		threading.Thread.__init__(self)
 		self.daemon = True
 		self.filename = filename
+		self.play_begin = 0
 	def run(self):
 		if os.path.exists(self.filename):
+			self.play_begin = time.time()
 			try:
 				subprocess.call(["mplayer", self.filename], stdout=FNULL, stderr=subprocess.STDOUT)
 			except OSError as e:
 				if e.errno == errno.ENOENT:
 					subprocess.call(["mpg123", self.filename], stdout=FNULL, stderr=subprocess.STDOUT)
+	def played(self):
+		return 0 if self.play_begin == 0 else time.time() - self.play_begin
 
 def play(track_id, tip_line):
 	spinner = ['|', '/', '-', '\\']
@@ -142,12 +155,18 @@ def play(track_id, tip_line):
 		else: error("Failed to request: %d" % (r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
 
+	duration = get_duration(cached)
 	if extplayer is None:
 		extplayer = ExtPlayer(cached)
 		extplayer.start()
-	sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m  %s \033[2;30m[%s]\033[0m\033[K' % (info_line, tip_line,))
-	sys.stdout.flush()
-	extplayer.join()
+
+	while extplayer.isAlive():
+		bar = int((extplayer.played() / duration) * len(tip_line))
+		rich_tip_line = '\033[7m' + tip_line[:bar] + '\033[0m' + tip_line[bar:]
+		sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m  %s \033[2;30m[%s]\033[0m\033[K' % (info_line, rich_tip_line,))
+		sys.stdout.flush()
+		time.sleep(1)
+
 	sys.stdout.write(u'\r     %s \033[2;30m[%s]\033[0m\033[K' % (info_line, tip_line))
 	sys.stdout.flush()
 	return True
@@ -208,7 +227,8 @@ elif command == 'play':
 
 	# is it id?
 	if argument.isdigit():
-		played = play(int(argument), '1/1')
+		tid = int(argument)
+		played = play(tid, '#%d 1/1' % tid)
 
 	# is it artist?
 #	if not played:
@@ -227,7 +247,7 @@ elif command == 'play':
 			verbose('Going to play this stuff: ')
 			for i in jsn:
 				verbose('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-			for idx, track in enumerate(jsn): play(track['id'], '%d/%d' % (idx+1, len(jsn)) )
+			for idx, track in enumerate(jsn): play(track['id'], '#%d %d/%d' % (i['id'], idx+1, len(jsn)) )
 	
 	print("")		
 elif command == 'search' or command == 'xs':
