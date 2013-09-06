@@ -20,6 +20,7 @@ config_file = eqdir + '/.config.py'
 verbose = lambda str: True
 error = lambda str: print("\033[1;31mERROR\033[0m: %s" % str)
 FNULL = open(os.devnull, 'w')
+cached_mp3s = lambda : [ eqdir+'/'+f for f in os.listdir(eqdir) if f.endswith(".mp3") ]
 
 # check preconditions
 
@@ -231,7 +232,7 @@ def find_tracks(query):
 
 def cache_size():
 	sz = 0
-	for i in [ eqdir+'/'+f for f in os.listdir(eqdir) if f.endswith(".mp3") ]:
+	for i in cached_mp3s():
 		st = os.stat(i)
 		sz += st.st_size
 	return sz
@@ -341,7 +342,7 @@ elif command == 'list':
 	else:
 		error('Failed to fetch list')
 elif command == 'cleanup':
-	victims = [ eqdir+'/'+f for f in os.listdir(eqdir) if f.endswith(".mp3") ]
+	victims = cached_mp3s()
 	if len(victims) > 0:
 		print('Following files will be deleted: %s' % (reduce(lambda x, y: x + '\n  ' + y, victims, ''),))
 		print('Total: \033[1;31m' + human_readable(cache_size()) + '\033[0m\n')
