@@ -228,6 +228,19 @@ def find_tracks(query):
 		error('Failed to find tracks info')
 		return []
 	return r.json if old_req else r.json()
+
+def cache_size():
+	sz = 0
+	for i in [ eqdir+'/'+f for f in os.listdir(eqdir) if f.endswith(".mp3") ]:
+		st = os.stat(i)
+		sz += st.st_size
+	return sz
+
+def human_readable(num): # by Fred Cirera
+    for x in ['bytes','KB','MB','GB','TB']:
+        if num < 1024.0:
+            return "%3.1f %s" % (num, x)
+        num /= 1024.0
 	
 # execute the command
 
@@ -248,7 +261,7 @@ Commands:
                       when more than 1 arguments provided, will play all of them (TODO)
   search              search EqBeats
   list                list all tracks uploaded at EqBeats
-  cleanup             delete cached files
+  cleanup             delete cached mp3-files (currenty ~%s)
   complaint           annoyed? write a complaint
 
 Examples:
@@ -260,7 +273,7 @@ Examples:
   %s complaint "Such a good software"
 
 Report bugs to <igor.bereznyak@gmail.com>.'''
-% (sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
+% (sys.argv[0], human_readable(cache_size()), sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
 elif command == 'play':
 	played = False
 
@@ -331,6 +344,7 @@ elif command == 'cleanup':
 	victims = [ eqdir+'/'+f for f in os.listdir(eqdir) if f.endswith(".mp3") ]
 	if len(victims) > 0:
 		print('Following files will be deleted: %s' % (reduce(lambda x, y: x + '\n  ' + y, victims, ''),))
+		print('Total: \033[1;31m' + human_readable(cache_size()) + '\033[0m\n')
 		for i in range(5):
 			print('Press Ctrl+C to cancel \033[1;31m%d\033[0m' % (4-i,))
 			time.sleep(1)
