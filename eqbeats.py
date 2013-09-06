@@ -36,9 +36,11 @@ if not os.path.exists(config_file):
 # General settings
 #
 
-#check_update = 'always'        # Check for updates updates at every run
-check_update = 'on occasion'   # Check for updates updates occasionally
-#check_update = 'never'         # Never check for updates
+#check_update = 'always'       # Check for updates at every run
+check_update = 'on occasion'   # Check for updates occasionally
+#check_update = 'never'        # Never check for updates
+
+cache_json = True              # Save EqBeats' API output for futher re-using
 
 #
 # Options for the daemonic mode
@@ -218,7 +220,7 @@ def find_users(query):
 
 def get_track(tid):
 	cached_json = '%s/%d.json' % (eqdir, tid)
-	if os.path.exists(cached_json):
+	if config['cache_json'] and os.path.exists(cached_json):
 		f = open(cached_json, 'r')
 		jsn = f.read()
 		f.close()
@@ -228,9 +230,10 @@ def get_track(tid):
 			error('Failed to fetch track info')
 			return {}
 		jsn = r.text
-		f = open(cached_json, 'w')
-		f.write(jsn)
-		f.close()
+		if config['cache_json']:
+			f = open(cached_json, 'w')
+			f.write(jsn)
+			f.close()
 	return json.loads(jsn)
 
 def find_tracks(query):
