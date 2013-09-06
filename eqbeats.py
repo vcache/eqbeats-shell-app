@@ -275,7 +275,8 @@ elif command == 'play':
 			verbose('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
 		for idx, track in enumerate(tracks): play(track['id'], '#%d %d/%d' % (i['id'], idx+1, len(tracks)) )
 	
-	print("")		
+	sys.stdout.write('\r\033[K')
+	sys.stdout.flush()
 elif command == 'search':
 	verbose("Tracks matching \"%s\": " % (argument, ))
 	tracks = find_tracks(argument)
