@@ -5,7 +5,8 @@
 # TODO: playlists?
 
 from __future__ import print_function
-import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket, random, threading
+import sys, os, requests, errno, subprocess, time, json
+import pickle, pkg_resources, socket, random, threading
 from os.path import expanduser
 
 # init
@@ -216,11 +217,21 @@ def find_users(query):
 	return r.json if old_req else r.json()
 
 def get_track(tid):
-	r = requests.get('https://eqbeats.org/track/%d/json' % tid)
-	if r.status_code != 200:
-		error('Failed to fetch track info')
-		return {}
-	return r.json if old_req else r.json()
+	cached_json = '%s/%d.json' % (eqdir, tid)
+	if os.path.exists(cached_json):
+		f = open(cached_json, 'r')
+		jsn = f.read()
+		f.close()
+	else:
+		r = requests.get('https://eqbeats.org/track/%d/json' % tid)
+		if r.status_code != 200:
+			error('Failed to fetch track info')
+			return {}
+		jsn = r.text
+		f = open(cached_json, 'w')
+		f.write(jsn)
+		f.close()
+	return json.loads(jsn)
 
 def find_tracks(query):
 	r =  requests.get('https://eqbeats.org/tracks/search/json?q=%s' % query)
@@ -264,11 +275,10 @@ Examples:
   %s play evdog
   %s play "true true friend"
   %s search "sim gretina"
-  %s --play-latest --notify-latest daemon
   %s complaint "Such a good software"
 
 Report bugs to <igor.bereznyak@gmail.com>.'''
-% (sys.argv[0], human_readable(cache_size()), sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
+% (sys.argv[0], human_readable(cache_size()), sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
 elif command == 'play' and argument == '':
 	tracks = cached_mp3s()
 	for (idx, fname) in enumerate(tracks):
