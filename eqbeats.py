@@ -231,12 +231,7 @@ def find_tracks(query):
 		return []
 	return r.json if old_req else r.json()
 
-def cache_size():
-	sz = 0
-	for i in cached_mp3s():
-		st = os.stat(i)
-		sz += st.st_size
-	return sz
+def cache_size(): return reduce(lambda x, y: x + os.stat(y).st_size, cached_mp3s(), 0)
 
 def human_readable(num): # by Fred Cirera
     for x in ['bytes','KB','MB','GB','TB']:
