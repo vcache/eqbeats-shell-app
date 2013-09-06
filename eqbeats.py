@@ -133,41 +133,38 @@ class ExtPlayer(threading.Thread):
 def play(track_id, tip_line):
 	spinner = ['|', '/', '-', '\\']
 	cached = '%s/%d.mp3' % (eqdir, track_id, )
-	r = requests.get('https://eqbeats.org/track/%d/json' % (track_id,))
-	n = r.json if old_req else r.json()
+	n = get_track(track_id)
 	info_line = '\033[1;35m%s\033[0m by \033[35m%s\033[0m' % (n['title'], n['artist']['name'],)
 	extplayer = None
 	if not os.path.isfile(cached):
-		if r.status_code == 200:
-			verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
-			r2 = requests.get(n['download']['mp3']) if old_req else requests.get(n['download']['mp3'], stream=True)
-			if r2.status_code == 200:
-				verbose('Saving %s' % (cached, ))
-				f = open(cached, 'wb')
-				done = 0.0
-				total = float(r2.headers.get('content-length'))
-				t = 0
-				spin = 0
-				while True:
-					buf = r2.raw.read(8192)
-					if not buf: break
-					f.write(buf)
-					done = done + len(buf)
-					if time.time() - t >= .24:
-						percentage = done / total * 100.0
-						if percentage > 15.0 and extplayer is None:
-							extplayer = ExtPlayer(cached)
-							extplayer.start()
-						if extplayer is None:
-							sys.stdout.write( '\r  \033[1;31m%s\033[0m  %s \033[2;30m(buffering %.01f%%)\033[0m\033[K'%(spinner[spin % len(spinner)], info_line, percentage,))
-						else:
-							sys.stdout.write(u'\r  \033[32m\u25B6\033[0m  %s \033[2;30m(buffering %.01f%%)\033[0m\033[K'%(info_line, percentage,))
-						sys.stdout.flush()
-						spin += 1
-						t = time.time()
-				f.close()
-			else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
-		else: error("Failed to request: %d" % (r.status_code, ))
+		verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
+		r2 = requests.get(n['download']['mp3']) if old_req else requests.get(n['download']['mp3'], stream=True)
+		if r2.status_code == 200:
+			verbose('Saving %s' % (cached, ))
+			f = open(cached, 'wb')
+			done = 0.0
+			total = float(r2.headers.get('content-length'))
+			t = 0
+			spin = 0
+			while True:
+				buf = r2.raw.read(8192)
+				if not buf: break
+				f.write(buf)
+				done = done + len(buf)
+				if time.time() - t >= .24:
+					percentage = done / total * 100.0
+					if percentage > 15.0 and extplayer is None:
+						extplayer = ExtPlayer(cached)
+						extplayer.start()
+					if extplayer is None:
+						sys.stdout.write( '\r  \033[1;31m%s\033[0m  %s \033[2;30m(buffering %.01f%%)\033[0m\033[K'%(spinner[spin % len(spinner)], info_line, percentage,))
+					else:
+						sys.stdout.write(u'\r  \033[32m\u25B6\033[0m  %s \033[2;30m(buffering %.01f%%)\033[0m\033[K'%(info_line, percentage,))
+					sys.stdout.flush()
+					spin += 1
+					t = time.time()
+			f.close()
+		else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
 
 	duration = get_duration(cached)
@@ -300,7 +297,8 @@ elif command == 'play':
 		verbose('Going to play this stuff: ')
 		for i in tracks:
 			verbose('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-		for idx, track in enumerate(tracks): play(track['id'], '#%d %d/%d' % (i['id'], idx+1, len(tracks)) )
+		for idx, track in enumerate(tracks):
+			play(track['id'], '#%d %d/%d' % (track['id'], idx+1, len(tracks)) )
 	
 	sys.stdout.write('\r\033[K')
 	sys.stdout.flush()
