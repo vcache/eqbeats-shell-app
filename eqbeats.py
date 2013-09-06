@@ -24,7 +24,7 @@ FNULL = open(os.devnull, 'w')
 # check preconditions
 
 if not os.path.exists(eqdir):
-	print('Creating new directory %s' % (eqdir, ))
+	print('Creating new directory %s' % eqdir)
 	os.makedirs(eqdir)
 
 if not os.path.exists(config_file):
@@ -35,7 +35,7 @@ if not os.path.exists(config_file):
 #
 
 #check_update = 'always'        # Check for updates updates at every run
-check_update = 'on occasion'   # Check for updates updates at occasionally
+check_update = 'on occasion'   # Check for updates updates occasionally
 #check_update = 'never'         # Never check for updates
 
 #
