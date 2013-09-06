@@ -134,6 +134,7 @@ def play(track_id, tip_line):
 	spinner = ['|', '/', '-', '\\']
 	cached = '%s/%d.mp3' % (eqdir, track_id, )
 	n = get_track(track_id)
+	if (n == {} or n == None): return False
 	info_line = '\033[1;35m%s\033[0m by \033[35m%s\033[0m' % (n['title'], n['artist']['name'],)
 	extplayer = None
 	if not os.path.isfile(cached):
