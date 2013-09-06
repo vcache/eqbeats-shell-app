@@ -75,8 +75,9 @@ while i < len(sys.argv):
 		command = sys.argv[i]
 	elif sys.argv[i] in ['play', 'search', 'complaint']:
 		command = sys.argv[i]
-		argument = sys.argv[i+1]
-		i = i + 1
+		if i+1 < len(sys.argv):
+			argument = sys.argv[i+1]
+			i = i + 1
 	else:
 		print ("Unknown argument \033[1;31m%s\033[0m" % (sys.argv[i], ))
 		exit(1)
@@ -256,7 +257,7 @@ Commands:
   help                print this message and exit
   daemon              start workin in background command
   play                play music(if any), argument may be:
-                        - none, play all cached tracks (TODO)
+                        - none, play all cached tracks
                         - numerical id, play track with a give ID
                         - text string, play all tracks matching text
                       when more than 1 arguments provided, will play all of them (TODO)
@@ -275,6 +276,12 @@ Examples:
 
 Report bugs to <igor.bereznyak@gmail.com>.'''
 % (sys.argv[0], human_readable(cache_size()), sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
+elif command == 'play' and argument == '':
+	tracks = cached_mp3s()
+	for (idx, fname) in enumerate(tracks):
+		tid = int(fname[fname.rfind('/')+1:fname.rfind('.')])
+		play(tid, '#%d %d/%d' % (tid, idx+1, len(tracks)) )
+
 elif command == 'play':
 	played = False
 
