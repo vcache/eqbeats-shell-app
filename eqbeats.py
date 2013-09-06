@@ -8,28 +8,56 @@ from __future__ import print_function
 import sys, os, requests, errno, subprocess, time, pickle, pkg_resources, socket, random, threading
 from os.path import expanduser
 
-old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
-
 # init
 
 if not __name__ == '__main__': exit(0)
-
-play_latest = False
-notify_latest = False
+old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
+config = dict()
 command = ''
 argument = ''
 eqdir = '%s/.eqbeats' % (expanduser("~"),)
-check_period = 60*15
-
+config_file = eqdir + '/.config.py'
 verbose = lambda str: True
-is_verbose = False
 error = lambda str: print("\033[1;31mERROR\033[0m: %s" % str)
-
 FNULL = open(os.devnull, 'w')
+
+# check preconditions
+
+if not os.path.exists(eqdir):
+	print('Creating new directory %s' % (eqdir, ))
+	os.makedirs(eqdir)
+
+if not os.path.exists(config_file):
+	print('Creating default configuration file %s' % config_file)
+	f = open(config_file, 'w')
+	f.write('''#
+# General settings
+#
+
+#check_update = 'always'        # Check for updates updates at every run
+check_update = 'on occasion'   # Check for updates updates at occasionally
+#check_update = 'never'         # Never check for updates
+
+#
+# Options for the daemonic mode
+#
+
+play_latest = True             # Automatically play latest tracks
+notify_latest = True           # Do X-Notification about latest tracks
+check_period = 60 * 15         # How often check for a new latest (in seconds)''')
+	f.close()
+
+# load configuration
+
+try:
+	execfile(config_file, dict(), config)
+except IOError as e:
+	print('Failed to open config file %s: %s' % (config_file, e))
+	exit(1)
 
 # check updates
 
-if random.random() < .2:
+if (config['check_update'] == 'always') or (config['check_update'] == 'on occasion' and random.random() < .2):
 	r = requests.get('https://raw.github.com/vcache/eqbeats-shell-app/master/eqbeats.py')
 	f = open(sys.argv[0], 'r')
 	if not r.text == f.read():
@@ -40,16 +68,8 @@ if random.random() < .2:
 
 i = 1
 while i < len(sys.argv):
-	if sys.argv[i] == '--play-latest':
-		play_latest = True
-	elif sys.argv[i] == '--notify-latest':
-		notify_latest = True
-	elif sys.argv[i] == '--verbose':
+	if sys.argv[i] == '--verbose':
 		verbose = lambda str: print(str)
-		is_verbose = True
-	elif sys.argv[i].startswith('--check-period'):
-		k = sys.argv[i].find('=')
-		check_period = 60 * int((sys.argv[i])[k+1:])
 	elif sys.argv[i] in ['daemon', 'help', 'list', 'cleanup']:
 		command = sys.argv[i]
 	elif sys.argv[i] in ['play', 'search', 'complaint']:
@@ -60,12 +80,6 @@ while i < len(sys.argv):
 		print ("Unknown argument \033[1;31m%s\033[0m" % (sys.argv[i], ))
 		exit(1)
 	i = i + 1
-
-# check preconditions
-
-if not os.path.exists(eqdir):
-	verbose('Creating new directory %s' % (eqdir, ))
-	os.makedirs(eqdir)
 
 # common routines
 
@@ -223,9 +237,6 @@ EqBeats command line tool.
 
 Keys:
   --verbose           be verbose
-  --play-latest       download and play latest tracks (while in daemon)
-  --notify-latest     do X-notifications on latest tracks (while in daemon)
-  --check-period      how often do checks while daemon (in minutes)
 
 Commands:
   help                print this message and exit
@@ -288,7 +299,7 @@ elif command == 'search':
 	for i in users: print ('  \033[35m%s\033[0m: %s' % (i['name'], i['link'],))
 elif command == 'daemon':
 	verbose('Working as a daemon')
-	if not notify_latest and not play_latest:
+	if not config['notify_latest'] and not config['play_latest']:
 		error("Please select --play-latest or --notify-latest or both")
 		exit(1)
 	noticed_fname = '%s/.noticed' % (eqdir, )
@@ -301,11 +312,12 @@ elif command == 'daemon':
 			for i in jsn:
 				if not i['id'] in noticed:
 					verbose('New track %s\t\033[1;35m%s\033[0m by \033[35m%s\033[0m' %(i['id'], i['title'], i['artist']['name'],))
-					if notify_latest: subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
-					if play_latest: play(i['id'], '-')
+					if config['notify_latest']:
+						subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
+					if config['play_latest']: play(i['id'], '-')
 					noticed.append(i['id'])
 					marshall(noticed, noticed_fname)
-		time.sleep(check_period)
+		time.sleep(config['check_period'])
 		# TODO: substract froms sleep time already spent
 elif command == 'list':
 	r = requests.get('https://eqbeats.org/tracks/all/json')
