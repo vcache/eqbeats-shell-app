@@ -231,9 +231,12 @@ def get_track(tid):
 			return {}
 		jsn = r.text
 		if config['cache_json']:
-			f = open(cached_json, 'w')
-			f.write(jsn)
-			f.close()
+			try:
+				f = open(cached_json, 'w')
+				f.write(jsn)
+				f.close()
+			except:
+				error('Failed to save JSON cached for #%d' % tid)
 	return json.loads(jsn)
 
 def find_tracks(query):
@@ -337,14 +340,17 @@ elif command == 'daemon':
 		if r.status_code == 200:
 			noticed = demarshall(noticed_fname)
 			jsn = r.json if old_req else r.json()
+			new_cnt = reduce(lambda x, y: x + (1 if not y['id'] in noticed else 0), jsn, 0)
+			new_shown = 1
 			for i in jsn:
 				if not i['id'] in noticed:
 					verbose('New track %s\t\033[1;35m%s\033[0m by \033[35m%s\033[0m' %(i['id'], i['title'], i['artist']['name'],))
 					if config['notify_latest']:
 						subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
-					if config['play_latest']: play(i['id'], '-')
+					if config['play_latest']: play(i['id'], '#%d %d/%d' % (i['id'], new_shown, new_cnt))
 					noticed.append(i['id'])
 					marshall(noticed, noticed_fname)
+					new_shown+=1
 		time.sleep(config['check_period'])
 		# TODO: substract froms sleep time already spent
 elif command == 'list':
