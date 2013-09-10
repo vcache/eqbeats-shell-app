@@ -273,7 +273,7 @@ Commands:
                       when more than 1 arguments provided, will play all of them (TODO)
   search              search EqBeats
   list                list all tracks uploaded at EqBeats
-  cleanup             delete cached mp3-files (currenty ~%s)
+  cleanup             delete cached mp3-files (currently ~%s)
   complaint           annoyed? write a complaint
 
 Examples:
