@@ -15,7 +15,7 @@ if not __name__ == '__main__': exit(0)
 old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
 config = dict()
 command = ''
-argument = ''
+arguments = []
 eqdir = '%s/.eqbeats' % (expanduser("~"),)
 config_file = eqdir + '/.config.py'
 verbose = lambda str: True
@@ -78,11 +78,13 @@ while i < len(sys.argv):
 		command = sys.argv[i]
 	elif sys.argv[i] in ['play', 'search', 'complaint']:
 		command = sys.argv[i]
-		if i+1 < len(sys.argv):
-			argument = sys.argv[i+1]
-			i = i + 1
+		j = i+1
+		while j < len(sys.argv):
+			arguments.append(sys.argv[j])
+			i += 1
+			j += 1
 	else:
-		print ("Unknown argument \033[1;31m%s\033[0m" % (sys.argv[i], ))
+		print ("Unknown command \033[1;31m%s\033[0m" % (sys.argv[i], ))
 		exit(1)
 	i = i + 1
 
@@ -270,7 +272,7 @@ def human_readable(num): # by Fred Cirera
 # execute the command
 
 if command == 'help' or command == '':
-	print ('''Usage: %s [KEY]... COMMAND [ARGUMENT]
+	print ('''Usage: %s [KEY]... COMMAND [ARGUMENT]...
 EqBeats command line tool.
 
 Keys:
@@ -283,64 +285,50 @@ Commands:
                         - none, play all cached tracks
                         - numerical id, play track with a give ID
                         - text string, play all tracks matching text
-                      when more than 1 arguments provided, will play all of them (TODO)
+                      when more than 1 arguments provided, will play all of them
   search              search EqBeats
   list                list all tracks uploaded at EqBeats
   cleanup             delete cached mp3-files (currently ~%s)
   complaint           annoyed? write a complaint
 
 Examples:
-  %s play 1234
-  %s play evdog
-  %s play "true true friend"
+  %s play 1234 1235 1236
+  %s play evdog sci lenich vivix
+  %s play "true true friend" zorg scootaloo
   %s search "sim gretina"
   %s complaint "Such a good software"
 
 Report bugs to <igor.bereznyak@gmail.com>.'''
 % (sys.argv[0], human_readable(cache_size()), sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
-elif command == 'play' and argument == '':
+elif command == 'play' and len(arguments) == 0:
 	tracks = cached_mp3s()
 	for (idx, fname) in enumerate(tracks):
 		tid = int(fname[fname.rfind('/')+1:fname.rfind('.')])
 		play(tid, '#%d %d/%d' % (tid, idx+1, len(tracks)) )
 
 elif command == 'play':
-	played = False
+	playlist = []
+	for arg in arguments:
+		if arg.isdigit():  # is it id?
+			playlist.append(int(arg))
+		else:              # is it search query?
+			tracks = find_tracks(arg)
+			for t in tracks: playlist.append(t['id'])
 
-	# is it id?
-	if argument.isdigit():
-		tid = int(argument)
-		played = play(tid, '#%d 1/1' % tid)
+	total = len(playlist)
+	for idx, tid in enumerate(playlist): play(tid, '#%d %d/%d' % (tid, idx+1, total))
 
-	# is it artist?
-#	if not played:
-#		r = requests.get('https://eqbeats.org/users/search/json?q=%s' % (argument, ))
-#		if r.status_code == 200:
-#			jsn = r.json if old_req else r.json()
-#			for artist in jsn:
-#				for track in artist['tracks']:
-#					played = played or play(track['id'])
-
-	# is it tracks?
-	if not played:
-		tracks = find_tracks(argument)
-		verbose('Going to play this stuff: ')
-		for i in tracks:
-			verbose('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-		for idx, track in enumerate(tracks):
-			play(track['id'], '#%d %d/%d' % (track['id'], idx+1, len(tracks)) )
-	
 	sys.stdout.write('\r\033[K')
 	sys.stdout.flush()
 elif command == 'search':
-	verbose("Tracks matching \"%s\": " % (argument, ))
-	tracks = find_tracks(argument)
-	if len(tracks) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
-	for i in tracks:
-		print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
-	users = find_users(argument)
-	verbose("Users matching \"%s\": " % (argument, ))
-	for i in users: print ('  \033[35m%s\033[0m: %s' % (i['name'], i['link'],))
+	if len(arguments) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
+	for arg in arguments:
+		tracks = find_tracks(arg)
+		for i in tracks:
+			print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
+	for arg in arguments:
+		users = find_users(arg)
+		for i in users: print ('  \033[35m%s\033[0m: %s' % (i['name'], i['link'],))
 elif command == 'daemon':
 	verbose('Working as a daemon')
 	if not config['notify_latest'] and not config['play_latest']:
@@ -387,7 +375,7 @@ elif command == 'cleanup':
 			time.sleep(1)
 		for i in victims: os.remove(i)
 elif command == 'complaint':
-	complaint('!mail igor I just try your "eqbeats-shell-app" and here what I think about it: "' + argument + '". Thats all. Deal with it.')
+	complaint('!mail igor I just try your "eqbeats-shell-app" and here what I think about it: "' + arguments[0] + '". Thats all. Deal with it.')
 else:
 	error('Unknown command: %s' % (command, ))
 	exit(1)
