@@ -244,7 +244,20 @@ def find_tracks(query):
 	if r.status_code != 200:
 		error('Failed to find tracks info')
 		return []
-	return r.json if old_req else r.json()
+	jsn = r.json if old_req else r.json()
+	tracks_into_cache(jsn)
+	return jsn
+
+def tracks_into_cache(tracks):
+	for t in tracks:
+		cached_json = '%s/%d.json' % (eqdir, t['id'])
+		if (os.path.exists(cached_json)): continue
+		try:
+			f = open(cached_json, "w")
+			f.write(json.dumps(t))
+			f.close()
+		except:
+			error("Failed to save JSON cached for #%d" % t['id'])
 
 def cache_size(): return reduce(lambda x, y: x + os.stat(y).st_size, cached_mp3s(), 0)
 
@@ -340,6 +353,7 @@ elif command == 'daemon':
 		if r.status_code == 200:
 			noticed = demarshall(noticed_fname)
 			jsn = r.json if old_req else r.json()
+			tracks_into_cache(jsn)
 			new_cnt = reduce(lambda x, y: x + (1 if not y['id'] in noticed else 0), jsn, 0)
 			new_shown = 1
 			for i in jsn:
@@ -357,8 +371,10 @@ elif command == 'list':
 	r = requests.get('https://eqbeats.org/tracks/all/json')
 	if r.status_code == 200:
 		jsn = r.json if old_req else r.json()
+		tracks_into_cache(jsn)
 		for i in jsn:
-			print ('  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'],))
+			qwe = '  %d\t\033[1;35m%s\033[0m by \033[35m%s\033[0m @ %s ' % (i['id'], i['title'], i['artist']['name'], i['link'])
+			print(qwe.encode('utf-8').strip())
 	else:
 		error('Failed to fetch list')
 elif command == 'cleanup':
