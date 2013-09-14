@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 #
-# TODO: playing queue
 # TODO: play-random
 # TODO: playlists?
 
@@ -12,6 +11,17 @@ from os.path import expanduser
 # init
 
 if not __name__ == '__main__': exit(0)
+config_default = {
+	'check_update' : {
+		'comment':
+		'How often automatically check for updates:\n# "always": at every run, "on occasion": occasionally, "never": never check',
+		'default': '"on occasion"'
+	},
+	'cache_json'   : {'comment': 'Save EqBeats\'s API output for futher re-using', 'default': 'True'},
+	'shuffle'      : {'comment': 'Randomly shuffle playing queue', 'default': 'False'},
+	'play_latest'  : {'comment': 'Automatically play latest tracks (for "daemon" command)', 'default': 'True'},
+	'notify_latest': {'comment': 'Do an X-Notification about latest tracks (for "daemon" command)', 'default': 'True'},
+	'check_period' : {'comment': 'How often to check for a new tracks (in seconds) (for "daemon" command)', 'default': '60 * 15'}}
 old_req = pkg_resources.get_distribution("requests").version < '1.0.0'
 config = dict()
 command = ''
@@ -32,23 +42,11 @@ if not os.path.exists(eqdir):
 if not os.path.exists(config_file):
 	print('Creating default configuration file %s' % config_file)
 	f = open(config_file, 'w')
-	f.write('''#
-# General settings
-#
-
-#check_update = 'always'       # Check for updates at every run
-check_update = 'on occasion'   # Check for updates occasionally
-#check_update = 'never'        # Never check for updates
-
-cache_json = True              # Save EqBeats' API output for futher re-using
-
-#
-# Options for the daemonic mode
-#
-
-play_latest = True             # Automatically play latest tracks
-notify_latest = True           # Do X-Notification about latest tracks
-check_period = 60 * 15         # How often check for a new latest (in seconds)''')
+	new_cfg = reduce(
+		lambda x, y: x + '# ' + config_default[y]['comment'] + '\n' + y + ' = ' + config_default[y]['default']  + '\n\n',
+		config_default,
+		'# This is eqbeats-shell-app configuration file #\n\n')
+	f.write(new_cfg)
 	f.close()
 
 # load configuration
@@ -58,6 +56,11 @@ try:
 except IOError as e:
 	print('Failed to open config file %s: %s' % (config_file, e))
 	exit(1)
+
+for c in config_default:
+	if not c in config:
+		print('Parameter "\033[1;34m%s\033[0m" not specified withing config file (\033[1;34m%s\033[0m), using default value' % (c, config_file))
+		config[c] = eval(config_default[c]['default'])
 
 # check updates
 
@@ -307,16 +310,17 @@ elif command == 'play' and len(arguments) == 0:
 		play(tid, '#%d %d/%d' % (tid, idx+1, len(tracks)) )
 
 elif command == 'play':
-	playlist = []
+	queue = []
 	for arg in arguments:
 		if arg.isdigit():  # is it id?
-			playlist.append(int(arg))
+			queue.append(int(arg))
 		else:              # is it search query?
 			tracks = find_tracks(arg)
-			for t in tracks: playlist.append(t['id'])
+			for t in tracks: queue.append(t['id'])
 
-	total = len(playlist)
-	for idx, tid in enumerate(playlist): play(tid, '#%d %d/%d' % (tid, idx+1, total))
+	if (config['shuffle']): random.shuffle(queue)
+	total = len(queue)
+	for idx, tid in enumerate(queue): play(tid, '#%d %d/%d' % (tid, idx+1, total))
 
 	sys.stdout.write('\r\033[K')
 	sys.stdout.flush()
