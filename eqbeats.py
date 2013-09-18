@@ -138,11 +138,52 @@ class ExtPlayer(threading.Thread):
 	def played(self):
 		return 0 if self.play_begin == 0 else time.time() - self.play_begin
 
-def play(track_id, tip_line):
+'''
+class ShellPlayer():
+	spinner = ('|', '/', '-', '\\')
+	def __init__(self, queue):	
+		self.extplayer = None
+		self.percentage = .0
+		self.last_redraw = 0
+		self.redraw_min_period = .24
+		self.ticks = 0
+		self.queue = queue
+	def run(self):
+		now_playing = 0
+		track = None
+		cbreaks
+		while self.playing:
+			if track = None:
+				track = get_track from self.queue[now_playing]
+				set percentage = 0
+				set downloaded = 0
+				if extplayer: extplayer.kill()
+			if not downloaded:
+				download chunk and safe to file chunk
+				update percentage
+			if download done: duration = ...
+			if not self.extplayer and (buffered > .15 or downloaded): run extplayer
+			self.redraw_line()
+			poll for keyinput (timeout = 100 if downloaded else 0)
+				process !all! keys
+			if ExtPlayer and not ExtPlayer.ISalive(): now_playing++
+			if now_playing > queue: break
+			if now_playing changed: track = None
+		no_cbreaks
+	def redraw_line(self):
+		if time.time() - self.last_redraw >= self.redraw_min_period:
+			sys.stdout.write(u'\r  %s  %s%s\033[K' % (
+				u'\033[32m\u25B6\033[0m' if self.extplayer else '\033[1;31m%s\033[0m ' % self.spinner[self.ticks % len(self.spinner)],
+				info_line,
+				' \033[2;30m(buffering %.01f%%)\033[0m' % self.percentage if self.percentage < 1 else ''))
+			sys.stdout.flush()
+			self.ticks += 1
+			self.last_redraw = time.time()
+'''
+
+def play(n, tip_line):
 	spinner = ['|', '/', '-', '\\']
-	cached = '%s/%d.mp3' % (eqdir, track_id, )
-	n = get_track(track_id)
-	if (n == {} or n == None): return False
+	cached = '%s/%d.mp3' % (eqdir, n['id'])
 	info_line = '\033[1;35m%s\033[0m by \033[35m%s\033[0m' % (n['title'], n['artist']['name'],)
 	extplayer = None
 	if not os.path.isfile(cached):
@@ -191,6 +232,22 @@ def play(track_id, tip_line):
 	sys.stdout.write(u'\r     %s \033[2;30m[%s]\033[0m\033[K' % (info_line, tip_line))
 	sys.stdout.flush()
 	return True
+
+def play_queue(queue, notify, really_play, noticed_fname = ''):
+	total = len(queue)
+	if noticed_fname: noticed = demarshall(noticed_fname)
+	for idx, tid in enumerate(queue):
+		t = get_track(tid)
+		if (t == {} or t == None): continue
+		if notify:
+			subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (t['id'], t['artist']['name'])])
+		if really_play:
+			play(t, '#%d %d/%d' % (tid, idx+1, total))
+		if noticed_fname:
+			noticed.append(tid)
+			marshall(noticed, noticed_fname)
+	sys.stdout.write('\r\033[K')
+	sys.stdout.flush()
 
 def complaint(msg):
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -304,11 +361,8 @@ Examples:
 Report bugs to <igor.bereznyak@gmail.com>.'''
 % (sys.argv[0], human_readable(cache_size()), sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
 elif command == 'play' and len(arguments) == 0:
-	tracks = cached_mp3s()
-	for (idx, fname) in enumerate(tracks):
-		tid = int(fname[fname.rfind('/')+1:fname.rfind('.')])
-		play(tid, '#%d %d/%d' % (tid, idx+1, len(tracks)) )
-
+	queue = map(lambda x: int(x[x.rfind('/')+1 : x.rfind('.')]), cached_mp3s())
+	play_queue(queue, False, True)
 elif command == 'play':
 	queue = []
 	for arg in arguments:
@@ -319,11 +373,7 @@ elif command == 'play':
 			for t in tracks: queue.append(t['id'])
 
 	if (config['shuffle']): random.shuffle(queue)
-	total = len(queue)
-	for idx, tid in enumerate(queue): play(tid, '#%d %d/%d' % (tid, idx+1, total))
-
-	sys.stdout.write('\r\033[K')
-	sys.stdout.flush()
+	play_queue(queue, False, True)
 elif command == 'search':
 	if len(arguments) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
 	for arg in arguments:
@@ -346,17 +396,9 @@ elif command == 'daemon':
 			noticed = demarshall(noticed_fname)
 			jsn = r.json if old_req else r.json()
 			tracks_into_cache(jsn)
-			new_cnt = reduce(lambda x, y: x + (1 if not y['id'] in noticed else 0), jsn, 0)
-			new_shown = 1
-			for i in jsn:
-				if not i['id'] in noticed:
-					verbose('New track %s\t\033[1;35m%s\033[0m by \033[35m%s\033[0m' %(i['id'], i['title'], i['artist']['name'],))
-					if config['notify_latest']:
-						subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (i['id'], i['artist']['name'],)])
-					if config['play_latest']: play(i['id'], '#%d %d/%d' % (i['id'], new_shown, new_cnt))
-					noticed.append(i['id'])
-					marshall(noticed, noticed_fname)
-					new_shown+=1
+			newest = filter(lambda x: not x['id'] in noticed, jsn)
+			queue = map(lambda x: x['id'], newest)
+			play_queue(queue, config['notify_latest'], config['play_latest'], noticed_fname)
 		time.sleep(config['check_period'])
 		# TODO: substract froms sleep time already spent
 elif command == 'list':
