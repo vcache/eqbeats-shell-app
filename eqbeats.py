@@ -137,7 +137,6 @@ class ExtPlayer(threading.Thread):
 					subprocess.call(["mpg123", self.filename], stdout=FNULL, stderr=subprocess.STDOUT)
 	def played(self):
 		return 0 if self.play_begin == 0 else time.time() - self.play_begin
-
 '''
 class ShellPlayer():
 	spinner = ('|', '/', '-', '\\')
@@ -151,13 +150,12 @@ class ShellPlayer():
 	def run(self):
 		now_playing = 0
 		track = None
-		cbreaks
-		while self.playing:
+		tty.setraw(sys.stdin.fileno())
+		while True:
 			if track = None:
-				track = get_track from self.queue[now_playing]
-				set percentage = 0
-				set downloaded = 0
-				if extplayer: extplayer.kill()
+				track = get_track(self.queue[now_playing])
+				self.percentage = 0
+				if self.extplayer: extplayer.kill()
 			if not downloaded:
 				download chunk and safe to file chunk
 				update percentage
@@ -179,8 +177,10 @@ class ShellPlayer():
 			sys.stdout.flush()
 			self.ticks += 1
 			self.last_redraw = time.time()
+	def getWindowSize:
+		import termios, fcntl, struct
+		term_yx = struct.unpack('hh', fcntl.ioctl(0, termios.TIOCGWINSZ, "    "))
 '''
-
 def play(n, tip_line):
 	spinner = ['|', '/', '-', '\\']
 	cached = '%s/%d.mp3' % (eqdir, n['id'])
@@ -188,7 +188,7 @@ def play(n, tip_line):
 	extplayer = None
 	if not os.path.isfile(cached):
 		verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
-		r2 = requests.get(n['download']['mp3']) if old_req else requests.get(n['download']['mp3'], stream=True)
+		r2 = requests.get(n['stream']['mp3']) if old_req else requests.get(n['stream']['mp3'], stream=True)
 		if r2.status_code == 200:
 			verbose('Saving %s' % (cached, ))
 			f = open(cached, 'wb')
@@ -214,7 +214,7 @@ def play(n, tip_line):
 					spin += 1
 					t = time.time()
 			f.close()
-		else: error("Failed to download %s: %d" % (n['download']['mp3'], r.status_code, ))
+		else: error("Failed to download %s: %d" % (n['stream']['mp3'], r.status_code, ))
 	else: verbose("Playing cached version %s" % (cached,))
 
 	duration = get_duration(cached)
