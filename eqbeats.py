@@ -448,7 +448,7 @@ elif command == 'daemon':
 			tracks_into_cache(jsn)
 			newest = filter(lambda x: not x['id'] in noticed, jsn)
 			queue = map(lambda x: x['id'], newest)
-			p = ShellPlayer(queue, config['notify_latest'], config['play_latest'], noticed_fname)
+			p = ShellPlayer(queue, config['notify_latest'], config['play_latest'])
 			noticed += p.run()
 			marshall(noticed, noticed_fname)
 		time.sleep(config['check_period'])
