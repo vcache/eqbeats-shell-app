@@ -6,6 +6,7 @@
 from __future__ import print_function
 import sys, os, requests, errno, subprocess, time, json
 import pickle, pkg_resources, socket, random, threading
+import fcntl, termios, select
 from os.path import expanduser
 
 # init
@@ -121,133 +122,175 @@ def get_duration(fname):
 			return float(f[k+1:])
 	return -1.0
 
-class ExtPlayer(threading.Thread):
-	def __init__(self,filename):
-		threading.Thread.__init__(self)
-		self.daemon = True
-		self.filename = filename
-		self.play_begin = 0
-	def run(self):
-		if os.path.exists(self.filename):
-			self.play_begin = time.time()
+class ShellPlayerState():
+	def __init__(self, track_id):
+		self.track = get_track(track_id)
+		self.mp3_filename = '%s/%d.mp3' % (eqdir, self.track['id'])
+		self.is_cached = os.path.isfile(self.mp3_filename)
+		self.duration = get_duration(self.mp3_filename) if self.is_cached else None
+		self.info_line = '\033[1;35m%s\033[0m by \033[35m%s\033[0m' % (self.track['title'], self.track['artist']['name'],)
+		self.req = None
+		self.is_eof = False
+		self.received = 0
+		self.length = None
+		self.buffered = 0
+		self.fd = None		
+		self.player = None
+		self.begin = None
+	def terminate(self):
+		# Terminate player
+		if self.player and not self.player.poll() == 0:
 			try:
-				subprocess.call(["mplayer", self.filename], stdout=FNULL, stderr=subprocess.STDOUT)
-			except OSError as e:
-				if e.errno == errno.ENOENT:
-					subprocess.call(["mpg123", self.filename], stdout=FNULL, stderr=subprocess.STDOUT)
-	def played(self):
-		return 0 if self.play_begin == 0 else time.time() - self.play_begin
-'''
+				self.player.kill()
+			except: pass
+			self.player = None
+		# Delete partial mp3
+		if not self.is_cached and not self.is_eof:
+			os.remove(self.mp3_filename)
+	def try_load_chunk(self):
+		if not self.is_cached and not self.is_eof:
+			if not self.req:
+				# Start downloding if not started yet
+				# TODO: try
+				self.req = requests.get(self.track['stream']['mp3']) if old_req else requests.get(self.track['stream']['mp3'], stream=True)
+				self.fd = open(self.mp3_filename, 'wb')
+				self.length = float(self.req.headers.get('content-length'))
+			else:
+				# Download next data chunk
+				buf = self.req.raw.read(8192)
+				if buf:
+					self.fd.write(buf)
+					self.received += len(buf)
+					self.buffered = self.received / self.length
+				else:
+					self.is_eof = True
+					self.fd.close()
+					self.duration = get_duration(self.mp3_filename)
+	def try_run_player(self):
+		# TODO: try
+		if self.player == None and (self.is_cached or self.is_eof or self.buffered > .15):
+			self.player = subprocess.Popen(["mplayer", self.mp3_filename], stdout=FNULL, stderr=subprocess.STDOUT, stdin=FNULL)
+			self.begin = time.time()
+			return True
+		return False
+	def is_playing(self):
+		return not self.player == None and not self.player.poll() == 0
+	def is_buffering(self):
+		return not self.req == None and not self.is_cached and not self.is_eof
+	def time_played(self):
+		return .0 if self.begin == None else time.time() - self.begin
+	def part_played(self):
+		return .0 if self.duration == None else self.time_played() / self.duration
+
 class ShellPlayer():
 	spinner = ('|', '/', '-', '\\')
-	def __init__(self, queue):	
-		self.extplayer = None
-		self.percentage = .0
-		self.last_redraw = 0
-		self.redraw_min_period = .24
-		self.ticks = 0
+	state = None
+	last_redraw = 0
+	ticks = 0
+	now_playing = 0
+	def __init__(self, queue, x_notify = False, really_play = True):
 		self.queue = queue
+		self.x_notify = x_notify
+		self.really_play = really_play
 	def run(self):
-		now_playing = 0
-		track = None
-		tty.setraw(sys.stdin.fileno())
-		while True:
-			if track = None:
-				track = get_track(self.queue[now_playing])
-				self.percentage = 0
-				if self.extplayer: extplayer.kill()
-			if not downloaded:
-				download chunk and safe to file chunk
-				update percentage
-			if download done: duration = ...
-			if not self.extplayer and (buffered > .15 or downloaded): run extplayer
+		# Put terminal into raw mode
+		fd = sys.stdin.fileno()
+		oldterm = termios.tcgetattr(fd)
+		newattr = termios.tcgetattr(fd)
+		newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
+		termios.tcsetattr(fd, termios.TCSANOW, newattr)
+		oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
+		fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
+		# Init polling object
+		pollobj = select.poll()
+		pollobj.register(fd, select.POLLIN)
+		# Main loop
+		working = True
+		played = []
+		current_track_id = -1
+		while self.now_playing < len(self.queue) and working:
+			# Prepare all info about new track to play
+			if not self.state:
+				current_track_id = self.queue[self.now_playing]
+				self.state = ShellPlayerState(current_track_id) # TODO: what if self.state == None?
+
+			# Start or continue downloading (if need)
+			self.state.try_load_chunk()
+
+			# If player not started and already have playable file
+			if self.really_play:
+				is_started = self.state.try_run_player()
+				# Notify X user
+				if self.x_notify and is_started:
+					t = self.state.track
+					subprocess.call(['notify-send', 'EqBeats.org', 'New tune #%d by %s' % (t['id'], t['artist']['name'])])
+
+			# Update prompt
 			self.redraw_line()
-			poll for keyinput (timeout = 100 if downloaded else 0)
-				process !all! keys
-			if ExtPlayer and not ExtPlayer.ISalive(): now_playing++
-			if now_playing > queue: break
-			if now_playing changed: track = None
-		no_cbreaks
-	def redraw_line(self):
-		if time.time() - self.last_redraw >= self.redraw_min_period:
-			sys.stdout.write(u'\r  %s  %s%s\033[K' % (
-				u'\033[32m\u25B6\033[0m' if self.extplayer else '\033[1;31m%s\033[0m ' % self.spinner[self.ticks % len(self.spinner)],
-				info_line,
-				' \033[2;30m(buffering %.01f%%)\033[0m' % self.percentage if self.percentage < 1 else ''))
-			sys.stdout.flush()
-			self.ticks += 1
-			self.last_redraw = time.time()
-	def getWindowSize:
-		import termios, fcntl, struct
-		term_yx = struct.unpack('hh', fcntl.ioctl(0, termios.TIOCGWINSZ, "    "))
-'''
-def play(n, tip_line):
-	spinner = ['|', '/', '-', '\\']
-	cached = '%s/%d.mp3' % (eqdir, n['id'])
-	info_line = '\033[1;35m%s\033[0m by \033[35m%s\033[0m' % (n['title'], n['artist']['name'],)
-	extplayer = None
-	if not os.path.isfile(cached):
-		verbose("Downloading %s by %s to %s" % (n['title'], n['artist']['name'], cached, ))
-		r2 = requests.get(n['stream']['mp3']) if old_req else requests.get(n['stream']['mp3'], stream=True)
-		if r2.status_code == 200:
-			verbose('Saving %s' % (cached, ))
-			f = open(cached, 'wb')
-			done = 0.0
-			total = float(r2.headers.get('content-length'))
-			t = 0
-			spin = 0
-			while True:
-				buf = r2.raw.read(8192)
-				if not buf: break
-				f.write(buf)
-				done = done + len(buf)
-				if time.time() - t >= .24:
-					percentage = done / total * 100.0
-					if percentage > 15.0 and extplayer is None:
-						extplayer = ExtPlayer(cached)
-						extplayer.start()
-					if extplayer is None:
-						sys.stdout.write( '\r  \033[1;31m%s\033[0m  %s \033[2;30m(buffering %.01f%%)\033[0m\033[K'%(spinner[spin % len(spinner)], info_line, percentage,))
-					else:
-						sys.stdout.write(u'\r  \033[32m\u25B6\033[0m  %s \033[2;30m(buffering %.01f%%)\033[0m\033[K'%(info_line, percentage,))
-					sys.stdout.flush()
-					spin += 1
-					t = time.time()
-			f.close()
-		else: error("Failed to download %s: %d" % (n['stream']['mp3'], r.status_code, ))
-	else: verbose("Playing cached version %s" % (cached,))
 
-	duration = get_duration(cached)
-	if extplayer is None:
-		extplayer = ExtPlayer(cached)
-		extplayer.start()
+			# Check for user's commands from keyboard
+			try:
+				ret = pollobj.poll(1000 if not self.state.is_buffering() else 0)
+			except:
+				continue
 
-	while extplayer.isAlive():
-		bar = int((extplayer.played() / duration) * len(tip_line))
-		rich_tip_line = '\033[7m' + tip_line[:bar] + '\033[0m' + tip_line[bar:]
-		sys.stdout.write(u'\r  \033[1;32m\u25B6\033[0m  %s \033[2;30m[%s]\033[0m\033[K' % (info_line, rich_tip_line,))
+			drop_state = False
+			if len(ret) > 0:
+				chars = sys.stdin.read(10)
+				for c in chars:
+					if c in ['x', 'X', 'q', 'Q']:
+						working = False
+					elif c in ['p', 'P']:
+						if self.now_playing > 0:
+							self.now_playing -= 1
+							drop_state = True
+					elif c in ['n', 'N']:
+						if self.now_playing + 1 < len(self.queue): 
+							self.now_playing += 1
+							drop_state = True
+
+			# Change track
+			if not self.state.is_buffering() and not self.state.is_playing():
+				self.now_playing += 1
+				drop_state = True
+				if not current_track_id in played: played.append(current_track_id)
+
+			# Drop state
+			if drop_state or not working:
+				self.state.terminate()
+				self.state = None
+
+		# Kill player's instance (if any)
+		if self.state: self.state.terminate()
+		# Return terminal into cooked mode
+		termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
+		fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
+		sys.stdout.write(u'\r\033[K')
 		sys.stdout.flush()
-		time.sleep(1)
+		return played
 
-	sys.stdout.write(u'\r     %s \033[2;30m[%s]\033[0m\033[K' % (info_line, tip_line))
-	sys.stdout.flush()
-	return True
+	def redraw_line(self):
+		if time.time() - self.last_redraw >= .24 and self.state:
+			if self.state.is_playing():
+				state_icon = u'\033[32m\u25B6\033[0m'
+			else:
+				state_icon = u'\033[1;31m'+ self.spinner[self.ticks % len(self.spinner)] + '\033[0m'
+				self.ticks += 1
 
-def play_queue(queue, notify, really_play, noticed_fname = ''):
-	total = len(queue)
-	if noticed_fname: noticed = demarshall(noticed_fname)
-	for idx, tid in enumerate(queue):
-		t = get_track(tid)
-		if (t == {} or t == None): continue
-		if notify:
-			subprocess.call(['notify-send', 'EqBeats.org', 'New tune %d by %s' % (t['id'], t['artist']['name'])])
-		if really_play:
-			play(t, '#%d %d/%d' % (tid, idx+1, total))
-		if noticed_fname:
-			noticed.append(tid)
-			marshall(noticed, noticed_fname)
-	sys.stdout.write('\r\033[K')
-	sys.stdout.flush()
+			if self.state.is_buffering():
+				percentage = self.state.buffered * 100.0
+				tip_line = u'\033[2;30mbuffering %.01f%%\033[0m' % percentage
+			else:
+				simple_tip_line = u'#%d %d/%d' % (self.state.track['id'], self.now_playing + 1, len(self.queue), )
+				bar = int(self.state.part_played() * len(simple_tip_line))
+				tip_line = '\033[7m' + simple_tip_line[:bar] + '\033[0m' + simple_tip_line[bar:]
+
+			sys.stdout.write(u'\r  %s  %s [%s]\033[K' % (state_icon, self.state.info_line, tip_line))
+			sys.stdout.flush()
+			self.last_redraw = time.time()
+#	def getWindowSize:
+#		import termios, fcntl, struct
+#		term_yx = struct.unpack('hh', fcntl.ioctl(0, termios.TIOCGWINSZ, "    "))
 
 def complaint(msg):
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -358,11 +401,17 @@ Examples:
   %s search "sim gretina"
   %s complaint "Such a good software"
 
+Keys during playback:
+  [N]                 Play next tune from queue
+  [P]                 Play previous tune from queue
+  [X] or [Q]          Quit player
+
 Report bugs to <igor.bereznyak@gmail.com>.'''
 % (sys.argv[0], human_readable(cache_size()), sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0],))
 elif command == 'play' and len(arguments) == 0:
 	queue = map(lambda x: int(x[x.rfind('/')+1 : x.rfind('.')]), cached_mp3s())
-	play_queue(queue, False, True)
+	p = ShellPlayer(queue)
+	p.run()
 elif command == 'play':
 	queue = []
 	for arg in arguments:
@@ -373,7 +422,8 @@ elif command == 'play':
 			for t in tracks: queue.append(t['id'])
 
 	if (config['shuffle']): random.shuffle(queue)
-	play_queue(queue, False, True)
+	p = ShellPlayer(queue)
+	p.run()
 elif command == 'search':
 	if len(arguments) == 0: verbose("\033[1;35m* (Nothing) *\033[0m")
 	for arg in arguments:
@@ -398,7 +448,9 @@ elif command == 'daemon':
 			tracks_into_cache(jsn)
 			newest = filter(lambda x: not x['id'] in noticed, jsn)
 			queue = map(lambda x: x['id'], newest)
-			play_queue(queue, config['notify_latest'], config['play_latest'], noticed_fname)
+			p = ShellPlayer(queue, config['notify_latest'], config['play_latest'], noticed_fname)
+			noticed += p.run()
+			marshall(noticed, noticed_fname)
 		time.sleep(config['check_period'])
 		# TODO: substract froms sleep time already spent
 elif command == 'list':

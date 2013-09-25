@@ -1,13 +1,12 @@
 1. Dependencies
 	* Teh Internets --- mandatory
 	* 'requests' module for Python --- mandatory (just as python itself)
-	* mplayer or mpg123 --- to be able to play tracks
+	* mplayer --- to be able to play tracks
 	* 'notify-send' tool --- to be able to make X notifications
-	* 'xsel' tool --- for 'eqbeats xs'
 
 2. Installation
-	Just copy (or make symbolic link) file somewhere where your PATH
-	points to and give +x permissions:
+	Just copy (or make symbolic link) file eqbeats.py somewhere where
+	your PATH points to and give +x permissions:
 	$ chmod +x eqbeats.py
 
 	# mv eqbeats.py /usr/bin/eqbeats
