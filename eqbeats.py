@@ -144,6 +144,9 @@ class ShellPlayerState():
 				self.player.kill()
 			except: pass
 			self.player = None
+		if self.fd:
+			self.fd.close()
+			self.fd = None
 		# Delete partial mp3
 		if not self.is_cached and not self.is_eof:
 			os.remove(self.mp3_filename)
@@ -165,6 +168,7 @@ class ShellPlayerState():
 				else:
 					self.is_eof = True
 					self.fd.close()
+					self.fd = None
 					self.duration = get_duration(self.mp3_filename)
 	def try_run_player(self):
 		# TODO: try
